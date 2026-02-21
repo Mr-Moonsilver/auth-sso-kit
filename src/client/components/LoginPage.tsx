@@ -14,13 +14,20 @@ export function LoginPage({
   subtitle = '',
   oidcButtonLabel = 'Log in with SSO',
   emailPlaceholder = 'your@email.com',
-  footerText = 'Only pre-approved email addresses can log in',
+  footerText,
 }: LoginPageProps) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const { login, loginWithOIDC, authMethod } = useAuth();
+  const { login, loginWithOIDC, authMethod, registrationMode } = useAuth();
+
+  // Derive footer text: respect explicit prop, otherwise adapt to registration mode
+  const resolvedFooterText = footerText !== undefined
+    ? footerText
+    : registrationMode === 'open'
+      ? 'Open registration \u2014 first user becomes admin'
+      : 'Only pre-approved email addresses can log in';
 
   // Check for OIDC error in URL hash
   useEffect(() => {
@@ -119,9 +126,9 @@ export function LoginPage({
           </form>
         )}
 
-        {footerText && (
+        {resolvedFooterText && (
           <p className="text-muted text-sm mt-md" style={{ textAlign: 'center' }}>
-            {footerText}
+            {resolvedFooterText}
           </p>
         )}
       </div>

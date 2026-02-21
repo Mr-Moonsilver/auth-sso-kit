@@ -11,6 +11,7 @@ import { createAdminAuthRouter } from './routes/admin-auth.js';
 declare module 'express-session' {
   interface SessionData {
     userId: number;
+    impersonateUserId?: number;
     oidcState?: string;
     oidcCodeVerifier?: string;
   }
@@ -19,6 +20,11 @@ declare module 'express-session' {
 export function setupAuth(app: Express, config: AuthKitConfig): SetupAuthResult {
   // Initialize DB schema
   config.db.initSchema();
+
+  // Seed default registration mode if not already set
+  if (!config.db.getSetting('registration_mode')) {
+    config.db.setSetting('registration_mode', config.defaultRegistrationMode ?? 'open');
+  }
 
   // Seed allowlist emails if provided
   if (config.seedEmails) {

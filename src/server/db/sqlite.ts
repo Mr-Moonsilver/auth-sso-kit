@@ -8,7 +8,13 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 export class SqliteAuthDB implements AuthDB {
-  constructor(private db: Database) {}
+  private defaultRegistrationMode: string = 'open';
+
+  constructor(private db: Database, options?: { defaultRegistrationMode?: 'open' | 'allowlist' }) {
+    if (options?.defaultRegistrationMode) {
+      this.defaultRegistrationMode = options.defaultRegistrationMode;
+    }
+  }
 
   initSchema(): void {
     const schemaPath = join(__dirname, 'schema.sql');
@@ -19,6 +25,24 @@ export class SqliteAuthDB implements AuthDB {
     try { this.db.exec('ALTER TABLE users ADD COLUMN email TEXT'); } catch { /* column exists */ }
     try { this.db.exec('ALTER TABLE users ADD COLUMN password_hash TEXT'); } catch { /* column exists */ }
     this.db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email ON users(email)');
+
+    // Seed default registration mode
+    this.db.prepare(
+      'INSERT OR IGNORE INTO auth_settings (key, value) VALUES (?, ?)'
+    ).run('registration_mode', this.defaultRegistrationMode);
+  }
+
+  getSetting(key: string): string | null {
+    const row = this.db.prepare(
+      'SELECT value FROM auth_settings WHERE key = ?'
+    ).get(key) as { value: string } | undefined;
+    return row?.value ?? null;
+  }
+
+  setSetting(key: string, value: string): void {
+    this.db.prepare(
+      'INSERT OR REPLACE INTO auth_settings (key, value) VALUES (?, ?)'
+    ).run(key, value);
   }
 
   findUserByEmail(email: string): AuthUser | null {

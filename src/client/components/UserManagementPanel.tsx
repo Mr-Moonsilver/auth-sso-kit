@@ -26,22 +26,45 @@ export function UserManagementPanel({ extraColumns }: UserManagementPanelProps) 
   const [resetUserId, setResetUserId] = useState<number | null>(null);
   const [resetPassword, setResetPassword] = useState('');
 
+  // Registration mode state
+  const [regMode, setRegMode] = useState<'open' | 'allowlist'>('open');
+
   useEffect(() => {
     loadData();
   }, []);
 
   const loadData = async () => {
     try {
-      const [usersData, emailsData] = await Promise.all([
+      const [usersData, emailsData, modeData] = await Promise.all([
         authApi.getUsers() as Promise<User[]>,
         authApi.getAllowedEmails() as Promise<AllowedEmail[]>,
+        authApi.getRegistrationMode().catch(() => ({ mode: 'open' as const })),
       ]);
       setUsers(usersData);
       setAllowedEmails(emailsData);
+      setRegMode(modeData.mode);
     } catch (err) {
       console.error(err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleSetRegMode = async (mode: 'open' | 'allowlist') => {
+    try {
+      await authApi.setRegistrationMode(mode);
+      setRegMode(mode);
+    } catch (err: any) {
+      alert(err.message);
+    }
+  };
+
+  const handleImpersonate = async (userId: number) => {
+    try {
+      await authApi.impersonateUser(userId);
+      window.location.href = '/';
+    } catch (err: any) {
+      alert(err.message);
     }
   };
 
@@ -116,9 +139,39 @@ export function UserManagementPanel({ extraColumns }: UserManagementPanelProps) 
   return (
     <>
       <div className="card mb-lg">
+        <h3 className="card-title mb-md">Registration Mode</h3>
+        <div className="flex gap-sm mb-md">
+          <button
+            className={`btn btn-sm ${regMode === 'open' ? 'btn-primary' : 'btn-secondary'}`}
+            onClick={() => handleSetRegMode('open')}
+          >
+            Open
+          </button>
+          <button
+            className={`btn btn-sm ${regMode === 'allowlist' ? 'btn-primary' : 'btn-secondary'}`}
+            onClick={() => handleSetRegMode('allowlist')}
+          >
+            Allowlist
+          </button>
+        </div>
+        <p className="text-sm text-muted">
+          {regMode === 'open'
+            ? 'Anyone with a valid email can register. The first user becomes admin.'
+            : 'Only pre-approved emails can log in.'}
+        </p>
+      </div>
+
+      <div className="card mb-lg">
         <h3 className="card-title mb-md">Email Allowlist</h3>
+        {regMode === 'open' && (
+          <p className="text-sm text-muted mb-lg" style={{ fontStyle: 'italic' }}>
+            The allowlist is not currently enforced. Switch to Allowlist mode to restrict registration.
+          </p>
+        )}
         <p className="text-sm text-muted mb-lg">
-          Only these email addresses can log in. Add emails before users authenticate.
+          {regMode === 'allowlist'
+            ? 'Only these email addresses can log in. Add emails before users authenticate.'
+            : 'Manage emails for when you switch to Allowlist mode.'}
         </p>
 
         <form onSubmit={handleAddEmail} className="flex gap-sm mb-md">
@@ -219,6 +272,12 @@ export function UserManagementPanel({ extraColumns }: UserManagementPanelProps) 
                         onClick={() => handleToggleAdmin(u.id, !u.isAdmin)}
                       >
                         {u.isAdmin ? 'Remove Admin' : 'Make Admin'}
+                      </button>
+                      <button
+                        className="btn btn-sm btn-secondary"
+                        onClick={() => handleImpersonate(u.id)}
+                      >
+                        Impersonate
                       </button>
                       {authMethod === 'password' && (
                         <button

@@ -39,4 +39,15 @@ export const authApi = {
   removeAllowedEmail: (id: number) => request(`/admin/allowed-emails/${id}`, { method: 'DELETE' }),
   resetUserPassword: (userId: number, password: string) =>
     request(`/admin/users/${userId}/reset-password`, { method: 'PUT', body: JSON.stringify({ password }) }),
+
+  // Admin — Impersonation
+  impersonateUser: (id: number) =>
+    request('/admin/impersonate/' + id, { method: 'POST' }),
+  stopImpersonating: () =>
+    request('/admin/stop-impersonate', { method: 'POST' }),
+
+  // Admin — Registration Mode
+  getRegistrationMode: () => request<{ mode: 'open' | 'allowlist' }>('/admin/registration-mode'),
+  setRegistrationMode: (mode: 'open' | 'allowlist') =>
+    request('/admin/registration-mode', { method: 'PUT', body: JSON.stringify({ mode }) }),
 };

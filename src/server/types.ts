@@ -19,6 +19,8 @@ export interface AuthKitConfig {
     onUserCreated?: (user: AuthUser) => void;
   };
   seedEmails?: Array<{ email: string; isAdmin?: boolean }>;
+  /** Default registration mode for fresh databases. Defaults to 'open'. */
+  defaultRegistrationMode?: 'open' | 'allowlist';
   /** Pass existing middleware to reuse instead of creating new instances */
   middleware?: {
     requireAuth: RequestHandler;

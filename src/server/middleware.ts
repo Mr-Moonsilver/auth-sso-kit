@@ -9,6 +9,11 @@ export interface AuthRequest extends Request {
     initials: string;
     isAdmin: boolean;
   };
+  impersonatedBy?: {
+    id: number;
+    name: string;
+    email: string;
+  };
 }
 
 export function createAuthMiddleware(db: AuthDB) {
@@ -22,6 +27,33 @@ export function createAuthMiddleware(db: AuthDB) {
     if (!user) {
       req.session.destroy(() => {});
       return res.status(401).json({ error: 'User not found' });
+    }
+
+    // Handle impersonation
+    if (req.session.impersonateUserId) {
+      if (user.isAdmin) {
+        const impersonated = db.findUserById(req.session.impersonateUserId);
+        if (impersonated) {
+          req.user = {
+            id: impersonated.id,
+            name: impersonated.name,
+            email: impersonated.email,
+            initials: impersonated.initials,
+            isAdmin: impersonated.isAdmin,
+          };
+          req.impersonatedBy = {
+            id: user.id,
+            name: user.name,
+            email: user.email,
+          };
+          return next();
+        }
+        // Impersonated user was deleted — clear and fall through
+        delete req.session.impersonateUserId;
+      } else {
+        // Real user lost admin status — clear impersonation
+        delete req.session.impersonateUserId;
+      }
     }
 
     req.user = {

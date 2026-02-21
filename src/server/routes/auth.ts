@@ -33,7 +33,11 @@ export function createAuthRouter(
 
   // Auth config — tells the client which auth method is active
   router.get('/config', (_req: Request, res: Response) => {
-    res.json({ method: isOIDCEnabled() ? 'oidc' : 'password' });
+    const registrationMode = db.getSetting('registration_mode') || 'open';
+    res.json({
+      method: isOIDCEnabled() ? 'oidc' : 'password',
+      registrationMode,
+    });
   });
 
   // Password login (disabled when SSO is enabled)
@@ -52,10 +56,11 @@ export function createAuthRouter(
     }
 
     const normalizedEmail = email.trim().toLowerCase();
+    const registrationMode = db.getSetting('registration_mode') || 'open';
 
-    // Check allowlist
+    // Check allowlist (skip in open mode)
     const allowed = db.findAllowedEmail(normalizedEmail);
-    if (!allowed) {
+    if (registrationMode === 'allowlist' && !allowed) {
       return res.status(403).json({ error: 'Email not authorized. Contact an administrator.' });
     }
 
@@ -68,11 +73,15 @@ export function createAuthRouter(
       const initials = generateInitials(name);
       const hash = await Bun.password.hash(password);
 
+      // First-user auto-admin in open mode
+      const isFirstUser = registrationMode === 'open' && db.listUsers().length === 0;
+      const isAdmin = isFirstUser || (allowed?.isAdmin ?? false);
+
       const newUser = db.createUser({
         name,
         email: normalizedEmail,
         initials,
-        isAdmin: allowed.isAdmin,
+        isAdmin,
         passwordHash: hash,
       });
 
@@ -168,10 +177,11 @@ export function createAuthRouter(
       }
 
       const normalizedEmail = email.trim().toLowerCase();
+      const registrationMode = db.getSetting('registration_mode') || 'open';
 
-      // Check allowlist
+      // Check allowlist (skip in open mode)
       const allowed = db.findAllowedEmail(normalizedEmail);
-      if (!allowed) {
+      if (registrationMode === 'allowlist' && !allowed) {
         return res.redirect('/#login?error=not_authorized');
       }
 
@@ -182,11 +192,15 @@ export function createAuthRouter(
         const name = (claims?.name as string) || deriveNameFromEmail(normalizedEmail);
         const initials = generateInitials(name);
 
+        // First-user auto-admin in open mode
+        const isFirstUser = registrationMode === 'open' && db.listUsers().length === 0;
+        const isAdmin = isFirstUser || (allowed?.isAdmin ?? false);
+
         user = db.createUser({
           name,
           email: normalizedEmail,
           initials,
-          isAdmin: allowed.isAdmin,
+          isAdmin,
         });
 
         hooks?.onUserCreated?.(user);
@@ -205,7 +219,11 @@ export function createAuthRouter(
 
   // Get current user
   router.get('/me', requireAuth as any, (req: AuthRequest, res: Response) => {
-    res.json(req.user);
+    const data: any = { ...req.user };
+    if (req.impersonatedBy) {
+      data.impersonatedBy = req.impersonatedBy;
+    }
+    res.json(data);
   });
 
   // Logout

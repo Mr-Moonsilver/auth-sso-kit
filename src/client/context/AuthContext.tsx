@@ -6,9 +6,12 @@ interface AuthContextValue {
   user: User | null;
   loading: boolean;
   authMethod: AuthMethod | null;
+  registrationMode: 'open' | 'allowlist' | null;
+  impersonatedBy: { id: number; name: string; email: string } | null;
   login: (email: string, password: string) => Promise<void>;
   loginWithOIDC: () => void;
   logout: () => Promise<void>;
+  stopImpersonating: () => Promise<void>;
   isAdmin: boolean;
 }
 
@@ -18,13 +21,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [authMethod, setAuthMethod] = useState<AuthMethod | null>(null);
+  const [registrationMode, setRegistrationMode] = useState<'open' | 'allowlist' | null>(null);
 
   useEffect(() => {
     Promise.all([
-      authApi.getAuthConfig().catch(() => ({ method: 'password' as AuthMethod })),
+      authApi.getAuthConfig().catch(() => ({ method: 'password' as AuthMethod, registrationMode: 'open' as const })),
       authApi.getMe().catch(() => null),
     ]).then(([config, me]) => {
-      setAuthMethod((config as AuthConfig).method);
+      const authConfig = config as AuthConfig;
+      setAuthMethod(authConfig.method);
+      setRegistrationMode(authConfig.registrationMode ?? null);
       setUser(me as User | null);
     }).finally(() => setLoading(false));
   }, []);
@@ -43,9 +49,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
   };
 
+  const stopImpersonating = async () => {
+    await authApi.stopImpersonating();
+    const me = await authApi.getMe().catch(() => null) as User | null;
+    setUser(me);
+  };
+
+  const impersonatedBy = user?.impersonatedBy ?? null;
+
   return (
     <AuthContext.Provider value={{
-      user, loading, authMethod, login, loginWithOIDC, logout,
+      user, loading, authMethod, registrationMode, impersonatedBy, login, loginWithOIDC, logout, stopImpersonating,
       isAdmin: user?.isAdmin ?? false,
     }}>
       {children}

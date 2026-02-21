@@ -47,6 +47,10 @@ export interface AuthDB {
   addAllowedEmail(email: string, addedBy: number): { id: number; email: string };
   removeAllowedEmail(id: number): { email: string } | null;
 
+  // Settings
+  getSetting(key: string): string | null;
+  setSetting(key: string, value: string): void;
+
   // Schema
   initSchema(): void;
 }

@@ -52,6 +52,53 @@ export function createAdminAuthRouter(
     res.json({ success: true });
   });
 
+  // Get registration mode
+  router.get('/registration-mode', requireAuth as any, requireAdmin as any, (_req: AuthRequest, res: Response) => {
+    const mode = db.getSetting('registration_mode') || 'open';
+    res.json({ mode });
+  });
+
+  // Set registration mode
+  router.put('/registration-mode', requireAuth as any, requireAdmin as any, (req: AuthRequest, res: Response) => {
+    const { mode } = req.body;
+    if (mode !== 'open' && mode !== 'allowlist') {
+      return res.status(400).json({ error: 'Mode must be "open" or "allowlist"' });
+    }
+    db.setSetting('registration_mode', mode);
+    res.json({ mode });
+  });
+
+  // Start impersonation
+  router.post('/impersonate/:id', requireAuth as any, requireAdmin as any, (req: AuthRequest, res: Response) => {
+    const targetId = Number(req.params.id);
+
+    if (targetId === req.user?.id) {
+      return res.status(400).json({ error: 'Cannot impersonate yourself' });
+    }
+
+    const target = db.findUserById(targetId);
+    if (!target) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    req.session.impersonateUserId = target.id;
+    res.json({
+      success: true,
+      impersonating: { id: target.id, name: target.name, email: target.email, initials: target.initials },
+    });
+  });
+
+  // Stop impersonation — requires auth only, NOT requireAdmin
+  // Authorizes via req.impersonatedBy (set by middleware when impersonating)
+  router.post('/stop-impersonate', requireAuth as any, (req: AuthRequest, res: Response) => {
+    if (!req.impersonatedBy) {
+      return res.status(400).json({ error: 'Not currently impersonating' });
+    }
+
+    delete req.session.impersonateUserId;
+    res.json({ success: true });
+  });
+
   // Reset user password (password mode only)
   router.put('/users/:id/reset-password', requireAuth as any, requireAdmin as any, async (req: AuthRequest, res: Response) => {
     const { id } = req.params;

@@ -18,5 +18,11 @@ CREATE TABLE IF NOT EXISTS allowed_emails (
     created_at TEXT DEFAULT (datetime('now'))
 );
 
+-- Settings (key-value store for runtime configuration)
+CREATE TABLE IF NOT EXISTS auth_settings (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL
+);
+
 CREATE INDEX IF NOT EXISTS idx_allowed_emails_email ON allowed_emails(email);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email ON users(email);

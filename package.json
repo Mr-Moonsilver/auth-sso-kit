@@ -1,0 +1,23 @@
+{
+  "name": "auth-sso-kit",
+  "version": "1.0.0",
+  "type": "module",
+  "exports": {
+    "./server": "./src/server/index.ts",
+    "./server/*": "./src/server/*",
+    "./client": "./src/client/index.ts",
+    "./client/*": "./src/client/*"
+  },
+  "peerDependencies": {
+    "express": "^4.22.0",
+    "express-session": "^1.18.0",
+    "openid-client": "^6.8.0",
+    "react": "^18.0.0"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.25",
+    "@types/express-session": "^1.18.0",
+    "@types/react": "^18.3.27",
+    "typescript": "^5.9.3"
+  }
+}

@@ -3,22 +3,7 @@ import * as client from 'openid-client';
 import type { AuthDB, AuthUser } from '../db/interface.js';
 import type { AuthRequest } from '../middleware.js';
 import { isOIDCEnabled, getAppUrl, getRedirectUri, getOIDCConfig } from '../oidc.js';
-
-function generateInitials(name: string): string {
-  const parts = name.trim().split(/\s+/);
-  if (parts.length >= 2) {
-    return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
-  }
-  return name.slice(0, 2).toUpperCase();
-}
-
-function deriveNameFromEmail(email: string): string {
-  const local = email.split('@')[0];
-  return local
-    .split('.')
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
-    .join(' ');
-}
+import { generateInitials, deriveNameFromEmail } from '../utils.js';
 
 export interface AuthRouterHooks {
   onUserCreated?: (user: AuthUser) => void;

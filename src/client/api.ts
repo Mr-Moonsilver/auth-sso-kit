@@ -40,6 +40,13 @@ export const authApi = {
   resetUserPassword: (userId: number, password: string) =>
     request(`/admin/users/${userId}/reset-password`, { method: 'PUT', body: JSON.stringify({ password }) }),
 
+  // Admin — Pre-create Users
+  preCreateUser: (email: string, name?: string) =>
+    request('/admin/users/pre-create', {
+      method: 'POST',
+      body: JSON.stringify({ email, ...(name ? { name } : {}) }),
+    }),
+
   // Admin — Impersonation
   impersonateUser: (id: number) =>
     request('/admin/impersonate/' + id, { method: 'POST' }),

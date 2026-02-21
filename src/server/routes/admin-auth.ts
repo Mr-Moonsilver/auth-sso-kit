@@ -1,11 +1,17 @@
 import { Router, Response, RequestHandler } from 'express';
-import type { AuthDB } from '../db/interface.js';
+import type { AuthDB, AuthUser } from '../db/interface.js';
 import type { AuthRequest } from '../middleware.js';
+import { generateInitials, deriveNameFromEmail } from '../utils.js';
+
+export interface AdminAuthRouterHooks {
+  onUserCreated?: (user: AuthUser) => void;
+}
 
 export function createAdminAuthRouter(
   db: AuthDB,
   requireAuth: RequestHandler,
   requireAdmin: RequestHandler,
+  hooks?: AdminAuthRouterHooks,
 ): Router {
   const router = Router();
 
@@ -97,6 +103,48 @@ export function createAdminAuthRouter(
 
     delete req.session.impersonateUserId;
     res.json({ success: true });
+  });
+
+  // Pre-create a user account
+  router.post('/users/pre-create', requireAuth as any, requireAdmin as any, (req: AuthRequest, res: Response) => {
+    const { email, name: providedName } = req.body;
+
+    if (!email || typeof email !== 'string' || !email.includes('@')) {
+      return res.status(400).json({ error: 'Valid email is required' });
+    }
+
+    const normalized = email.trim().toLowerCase();
+
+    const existing = db.findUserByEmail(normalized);
+    if (existing) {
+      return res.status(409).json({ error: 'User already exists' });
+    }
+
+    // Auto-add to allowlist if not already there
+    db.addAllowedEmail(normalized, req.user?.id ?? 0);
+
+    const name = (providedName && typeof providedName === 'string' && providedName.trim())
+      ? providedName.trim()
+      : deriveNameFromEmail(normalized);
+    const initials = generateInitials(name);
+
+    const newUser = db.createUser({
+      name,
+      email: normalized,
+      initials,
+      isAdmin: false,
+      passwordHash: null,
+    });
+
+    hooks?.onUserCreated?.(newUser);
+
+    res.json({
+      id: newUser.id,
+      name: newUser.name,
+      email: newUser.email,
+      initials: newUser.initials,
+      isAdmin: newUser.isAdmin,
+    });
   });
 
   // Reset user password (password mode only)

@@ -68,7 +68,9 @@ export function setupAuth(app: Express, config: AuthKitConfig): SetupAuthResult 
     onBeforeUserDelete: config.hooks?.onBeforeUserDelete,
   });
 
-  const adminAuthRouter = createAdminAuthRouter(config.db, requireAuth, requireAdmin);
+  const adminAuthRouter = createAdminAuthRouter(config.db, requireAuth, requireAdmin, {
+    onUserCreated: config.hooks?.onUserCreated,
+  });
 
   return {
     requireAuth,

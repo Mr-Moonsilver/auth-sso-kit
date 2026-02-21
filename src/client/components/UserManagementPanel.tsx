@@ -18,8 +18,9 @@ export function UserManagementPanel({ extraColumns }: UserManagementPanelProps) 
   const [allowedEmails, setAllowedEmails] = useState<AllowedEmail[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Email allowlist state
+  // Email allowlist / pre-create state
   const [newEmail, setNewEmail] = useState('');
+  const [newName, setNewName] = useState('');
   const [emailError, setEmailError] = useState('');
 
   // Password reset state
@@ -97,6 +98,24 @@ export function UserManagementPanel({ extraColumns }: UserManagementPanelProps) 
     try {
       await authApi.addAllowedEmail(newEmail.trim());
       setNewEmail('');
+      setNewName('');
+      loadData();
+    } catch (err: any) {
+      setEmailError(err.message);
+    }
+  };
+
+  const handlePreCreate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setEmailError('');
+    if (!newEmail.trim() || !newEmail.includes('@')) {
+      setEmailError('Valid email is required');
+      return;
+    }
+    try {
+      await authApi.preCreateUser(newEmail.trim(), newName.trim() || undefined);
+      setNewEmail('');
+      setNewName('');
       loadData();
     } catch (err: any) {
       setEmailError(err.message);
@@ -174,17 +193,32 @@ export function UserManagementPanel({ extraColumns }: UserManagementPanelProps) 
             : 'Manage emails for when you switch to Allowlist mode.'}
         </p>
 
-        <form onSubmit={handleAddEmail} className="flex gap-sm mb-md">
-          <input
-            type="email"
-            className="form-input"
-            value={newEmail}
-            onChange={(e) => setNewEmail(e.target.value)}
-            placeholder="email@example.com"
-            style={{ flex: 1 }}
-          />
-          <button type="submit" className="btn btn-primary">Add</button>
-        </form>
+        <div className="mb-md">
+          <div className="flex gap-sm mb-sm">
+            <input
+              type="email"
+              className="form-input"
+              value={newEmail}
+              onChange={(e) => setNewEmail(e.target.value)}
+              placeholder="email@example.com"
+              style={{ flex: 1 }}
+            />
+          </div>
+          <div className="flex gap-sm mb-sm">
+            <input
+              type="text"
+              className="form-input"
+              value={newName}
+              onChange={(e) => setNewName(e.target.value)}
+              placeholder="Name (optional)"
+              style={{ flex: 1 }}
+            />
+          </div>
+          <div className="flex gap-sm">
+            <button className="btn btn-secondary" onClick={handleAddEmail}>Add to Allowlist</button>
+            <button className="btn btn-primary" onClick={handlePreCreate}>Create Account</button>
+          </div>
+        </div>
 
         {emailError && (
           <div className="badge badge-danger mb-md" style={{ display: 'block', padding: '6px 10px' }}>{emailError}</div>

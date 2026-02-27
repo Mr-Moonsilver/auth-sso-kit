@@ -4,7 +4,7 @@ import type { AuthRequest } from '../middleware.js';
 import { generateInitials, deriveNameFromEmail } from '../utils.js';
 
 export interface AdminAuthRouterHooks {
-  onUserCreated?: (user: AuthUser) => void;
+  onUserCreated?: (user: AuthUser) => void | Promise<void>;
 }
 
 export function createAdminAuthRouter(
@@ -16,13 +16,13 @@ export function createAdminAuthRouter(
   const router = Router();
 
   // Get allowed emails
-  router.get('/allowed-emails', requireAuth as any, requireAdmin as any, (req: AuthRequest, res: Response) => {
-    const emails = db.listAllowedEmails();
+  router.get('/allowed-emails', requireAuth as any, requireAdmin as any, async (req: AuthRequest, res: Response) => {
+    const emails = await db.listAllowedEmails();
     res.json(emails);
   });
 
   // Add allowed email
-  router.post('/allowed-emails', requireAuth as any, requireAdmin as any, (req: AuthRequest, res: Response) => {
+  router.post('/allowed-emails', requireAuth as any, requireAdmin as any, async (req: AuthRequest, res: Response) => {
     const { email } = req.body;
     if (!email || typeof email !== 'string' || !email.includes('@')) {
       return res.status(400).json({ error: 'Valid email is required' });
@@ -30,20 +30,20 @@ export function createAdminAuthRouter(
 
     const normalized = email.trim().toLowerCase();
 
-    const existing = db.findAllowedEmail(normalized);
+    const existing = await db.findAllowedEmail(normalized);
     if (existing) {
       return res.status(409).json({ error: 'Email already in allowlist' });
     }
 
-    const result = db.addAllowedEmail(normalized, req.user?.id ?? 0);
+    const result = await db.addAllowedEmail(normalized, req.user?.id ?? 0);
     res.json(result);
   });
 
   // Remove allowed email
-  router.delete('/allowed-emails/:id', requireAuth as any, requireAdmin as any, (req: AuthRequest, res: Response) => {
+  router.delete('/allowed-emails/:id', requireAuth as any, requireAdmin as any, async (req: AuthRequest, res: Response) => {
     const { id } = req.params;
 
-    const entry = db.removeAllowedEmail(Number(id));
+    const entry = await db.removeAllowedEmail(Number(id));
     if (!entry) {
       return res.status(404).json({ error: 'Email not found' });
     }
@@ -51,7 +51,7 @@ export function createAdminAuthRouter(
     // Prevent removing own email from allowlist
     if (req.user?.email?.toLowerCase() === entry.email.toLowerCase()) {
       // Re-add it since we already removed
-      db.addAllowedEmail(entry.email, req.user?.id ?? 0);
+      await db.addAllowedEmail(entry.email, req.user?.id ?? 0);
       return res.status(400).json({ error: 'Cannot remove your own email from the allowlist' });
     }
 
@@ -59,30 +59,30 @@ export function createAdminAuthRouter(
   });
 
   // Get registration mode
-  router.get('/registration-mode', requireAuth as any, requireAdmin as any, (_req: AuthRequest, res: Response) => {
-    const mode = db.getSetting('registration_mode') || 'open';
+  router.get('/registration-mode', requireAuth as any, requireAdmin as any, async (_req: AuthRequest, res: Response) => {
+    const mode = await db.getSetting('registration_mode') || 'open';
     res.json({ mode });
   });
 
   // Set registration mode
-  router.put('/registration-mode', requireAuth as any, requireAdmin as any, (req: AuthRequest, res: Response) => {
+  router.put('/registration-mode', requireAuth as any, requireAdmin as any, async (req: AuthRequest, res: Response) => {
     const { mode } = req.body;
     if (mode !== 'open' && mode !== 'allowlist') {
       return res.status(400).json({ error: 'Mode must be "open" or "allowlist"' });
     }
-    db.setSetting('registration_mode', mode);
+    await db.setSetting('registration_mode', mode);
     res.json({ mode });
   });
 
   // Start impersonation
-  router.post('/impersonate/:id', requireAuth as any, requireAdmin as any, (req: AuthRequest, res: Response) => {
+  router.post('/impersonate/:id', requireAuth as any, requireAdmin as any, async (req: AuthRequest, res: Response) => {
     const targetId = Number(req.params.id);
 
     if (targetId === req.user?.id) {
       return res.status(400).json({ error: 'Cannot impersonate yourself' });
     }
 
-    const target = db.findUserById(targetId);
+    const target = await db.findUserById(targetId);
     if (!target) {
       return res.status(404).json({ error: 'User not found' });
     }
@@ -106,7 +106,7 @@ export function createAdminAuthRouter(
   });
 
   // Pre-create a user account
-  router.post('/users/pre-create', requireAuth as any, requireAdmin as any, (req: AuthRequest, res: Response) => {
+  router.post('/users/pre-create', requireAuth as any, requireAdmin as any, async (req: AuthRequest, res: Response) => {
     const { email, name: providedName } = req.body;
 
     if (!email || typeof email !== 'string' || !email.includes('@')) {
@@ -115,20 +115,20 @@ export function createAdminAuthRouter(
 
     const normalized = email.trim().toLowerCase();
 
-    const existing = db.findUserByEmail(normalized);
+    const existing = await db.findUserByEmail(normalized);
     if (existing) {
       return res.status(409).json({ error: 'User already exists' });
     }
 
     // Auto-add to allowlist if not already there
-    db.addAllowedEmail(normalized, req.user?.id ?? 0);
+    await db.addAllowedEmail(normalized, req.user?.id ?? 0);
 
     const name = (providedName && typeof providedName === 'string' && providedName.trim())
       ? providedName.trim()
       : deriveNameFromEmail(normalized);
     const initials = generateInitials(name);
 
-    const newUser = db.createUser({
+    const newUser = await db.createUser({
       name,
       email: normalized,
       initials,
@@ -136,7 +136,7 @@ export function createAdminAuthRouter(
       passwordHash: null,
     });
 
-    hooks?.onUserCreated?.(newUser);
+    await hooks?.onUserCreated?.(newUser);
 
     res.json({
       id: newUser.id,
@@ -156,13 +156,13 @@ export function createAdminAuthRouter(
       return res.status(400).json({ error: 'Password must be at least 8 characters' });
     }
 
-    const user = db.findUserById(Number(id));
+    const user = await db.findUserById(Number(id));
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
     }
 
     const hash = await Bun.password.hash(password);
-    db.updateUserPassword(Number(id), hash);
+    await db.updateUserPassword(Number(id), hash);
     res.json({ success: true });
   });
 

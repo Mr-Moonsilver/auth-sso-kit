@@ -16,7 +16,7 @@ export class SqliteAuthDB implements AuthDB {
     }
   }
 
-  initSchema(): void {
+  async initSchema(): Promise<void> {
     const schemaPath = join(__dirname, 'schema.sql');
     const schema = readFileSync(schemaPath, 'utf-8');
     this.db.exec(schema);
@@ -32,20 +32,20 @@ export class SqliteAuthDB implements AuthDB {
     ).run('registration_mode', this.defaultRegistrationMode);
   }
 
-  getSetting(key: string): string | null {
+  async getSetting(key: string): Promise<string | null> {
     const row = this.db.prepare(
       'SELECT value FROM auth_settings WHERE key = ?'
     ).get(key) as { value: string } | undefined;
     return row?.value ?? null;
   }
 
-  setSetting(key: string, value: string): void {
+  async setSetting(key: string, value: string): Promise<void> {
     this.db.prepare(
       'INSERT OR REPLACE INTO auth_settings (key, value) VALUES (?, ?)'
     ).run(key, value);
   }
 
-  findUserByEmail(email: string): AuthUser | null {
+  async findUserByEmail(email: string): Promise<AuthUser | null> {
     const row = this.db.prepare(
       'SELECT id, name, email, password_hash, initials, is_admin as isAdmin FROM users WHERE email = ? COLLATE NOCASE'
     ).get(email) as any | undefined;
@@ -54,7 +54,7 @@ export class SqliteAuthDB implements AuthDB {
     return { ...row, isAdmin: Boolean(row.isAdmin), passwordHash: row.password_hash };
   }
 
-  findUserById(id: number): AuthUser | null {
+  async findUserById(id: number): Promise<AuthUser | null> {
     const row = this.db.prepare(
       'SELECT id, name, email, initials, is_admin as isAdmin FROM users WHERE id = ?'
     ).get(id) as any | undefined;
@@ -63,7 +63,7 @@ export class SqliteAuthDB implements AuthDB {
     return { ...row, isAdmin: Boolean(row.isAdmin) };
   }
 
-  createUser(data: CreateUserData): AuthUser {
+  async createUser(data: CreateUserData): Promise<AuthUser> {
     const result = this.db.prepare(
       'INSERT INTO users (name, email, password_hash, initials, is_admin) VALUES (?, ?, ?, ?, ?)'
     ).run(data.name, data.email, data.passwordHash ?? null, data.initials, data.isAdmin ? 1 : 0);
@@ -77,7 +77,7 @@ export class SqliteAuthDB implements AuthDB {
     };
   }
 
-  listUsers(): AuthUser[] {
+  async listUsers(): Promise<AuthUser[]> {
     const rows = this.db.prepare(
       'SELECT id, name, email, initials, is_admin as isAdmin, created_at as createdAt FROM users ORDER BY name'
     ).all() as any[];
@@ -85,19 +85,19 @@ export class SqliteAuthDB implements AuthDB {
     return rows.map((u) => ({ ...u, isAdmin: Boolean(u.isAdmin) }));
   }
 
-  updateUserAdmin(id: number, isAdmin: boolean): void {
+  async updateUserAdmin(id: number, isAdmin: boolean): Promise<void> {
     this.db.prepare('UPDATE users SET is_admin = ? WHERE id = ?').run(isAdmin ? 1 : 0, id);
   }
 
-  deleteUser(id: number): void {
+  async deleteUser(id: number): Promise<void> {
     this.db.prepare('DELETE FROM users WHERE id = ?').run(id);
   }
 
-  updateUserPassword(id: number, hash: string): void {
+  async updateUserPassword(id: number, hash: string): Promise<void> {
     this.db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(hash, id);
   }
 
-  findAllowedEmail(email: string): AllowedEmailRecord | null {
+  async findAllowedEmail(email: string): Promise<AllowedEmailRecord | null> {
     const row = this.db.prepare(
       'SELECT id, email, is_admin as isAdmin FROM allowed_emails WHERE email = ? COLLATE NOCASE'
     ).get(email) as any | undefined;
@@ -106,7 +106,7 @@ export class SqliteAuthDB implements AuthDB {
     return { ...row, isAdmin: Boolean(row.isAdmin) };
   }
 
-  listAllowedEmails(): AllowedEmailWithStatus[] {
+  async listAllowedEmails(): Promise<AllowedEmailWithStatus[]> {
     const rows = this.db.prepare(`
       SELECT ae.id, ae.email, ae.is_admin as isAdmin, ae.created_at as createdAt,
              u.id as userId, u.name as userName
@@ -118,7 +118,7 @@ export class SqliteAuthDB implements AuthDB {
     return rows.map((e) => ({ ...e, isAdmin: Boolean(e.isAdmin) }));
   }
 
-  addAllowedEmail(email: string, addedBy: number): { id: number; email: string } {
+  async addAllowedEmail(email: string, addedBy: number): Promise<{ id: number; email: string }> {
     const normalized = email.trim().toLowerCase();
 
     const existing = this.db.prepare(
@@ -134,7 +134,7 @@ export class SqliteAuthDB implements AuthDB {
     return { id: result.lastInsertRowid as number, email: normalized };
   }
 
-  removeAllowedEmail(id: number): { email: string } | null {
+  async removeAllowedEmail(id: number): Promise<{ email: string } | null> {
     const entry = this.db.prepare(
       'SELECT email FROM allowed_emails WHERE id = ?'
     ).get(id) as { email: string } | undefined;

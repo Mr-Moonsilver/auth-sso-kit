@@ -3,7 +3,7 @@ import type { AuthDB } from '../db/interface.js';
 import type { AuthRequest } from '../middleware.js';
 
 export interface UsersRouterHooks {
-  onBeforeUserDelete?: (userId: number) => void;
+  onBeforeUserDelete?: (userId: number) => void | Promise<void>;
 }
 
 export function createUsersRouter(
@@ -15,13 +15,13 @@ export function createUsersRouter(
   const router = Router();
 
   // Get all users
-  router.get('/', requireAuth as any, (req: AuthRequest, res: Response) => {
-    const users = db.listUsers();
+  router.get('/', requireAuth as any, async (req: AuthRequest, res: Response) => {
+    const users = await db.listUsers();
     res.json(users);
   });
 
   // Toggle admin status
-  router.put('/:id/admin', requireAuth as any, requireAdmin as any, (req: AuthRequest, res: Response) => {
+  router.put('/:id/admin', requireAuth as any, requireAdmin as any, async (req: AuthRequest, res: Response) => {
     const { id } = req.params;
     const { isAdmin } = req.body;
 
@@ -29,12 +29,12 @@ export function createUsersRouter(
       return res.status(400).json({ error: 'Cannot remove your own admin status' });
     }
 
-    db.updateUserAdmin(Number(id), isAdmin);
+    await db.updateUserAdmin(Number(id), isAdmin);
     res.json({ success: true });
   });
 
   // Delete user
-  router.delete('/:id', requireAuth as any, requireAdmin as any, (req: AuthRequest, res: Response) => {
+  router.delete('/:id', requireAuth as any, requireAdmin as any, async (req: AuthRequest, res: Response) => {
     const { id } = req.params;
 
     if (Number(id) === req.user?.id) {
@@ -42,9 +42,9 @@ export function createUsersRouter(
     }
 
     // Call hook so the app can clean up its own tables
-    hooks?.onBeforeUserDelete?.(Number(id));
+    await hooks?.onBeforeUserDelete?.(Number(id));
 
-    db.deleteUser(Number(id));
+    await db.deleteUser(Number(id));
     res.json({ success: true });
   });
 

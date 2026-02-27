@@ -6,7 +6,7 @@ import { isOIDCEnabled, getAppUrl, getRedirectUri, getOIDCConfig } from '../oidc
 import { generateInitials, deriveNameFromEmail } from '../utils.js';
 
 export interface AuthRouterHooks {
-  onUserCreated?: (user: AuthUser) => void;
+  onUserCreated?: (user: AuthUser) => void | Promise<void>;
 }
 
 export function createAuthRouter(
@@ -17,12 +17,16 @@ export function createAuthRouter(
   const router = Router();
 
   // Auth config — tells the client which auth method is active
-  router.get('/config', (_req: Request, res: Response) => {
-    const registrationMode = db.getSetting('registration_mode') || 'open';
-    res.json({
-      method: isOIDCEnabled() ? 'oidc' : 'password',
-      registrationMode,
-    });
+  router.get('/config', async (_req: Request, res: Response) => {
+    try {
+      const registrationMode = await db.getSetting('registration_mode') || 'open';
+      res.json({
+        method: isOIDCEnabled() ? 'oidc' : 'password',
+        registrationMode,
+      });
+    } catch (err) {
+      res.status(500).json({ error: 'Internal server error' });
+    }
   });
 
   // Password login (disabled when SSO is enabled)
@@ -41,16 +45,16 @@ export function createAuthRouter(
     }
 
     const normalizedEmail = email.trim().toLowerCase();
-    const registrationMode = db.getSetting('registration_mode') || 'open';
+    const registrationMode = await db.getSetting('registration_mode') || 'open';
 
     // Check allowlist (skip in open mode)
-    const allowed = db.findAllowedEmail(normalizedEmail);
+    const allowed = await db.findAllowedEmail(normalizedEmail);
     if (registrationMode === 'allowlist' && !allowed) {
       return res.status(403).json({ error: 'Email not authorized. Contact an administrator.' });
     }
 
     // Find existing user
-    const existingUser = db.findUserByEmail(normalizedEmail);
+    const existingUser = await db.findUserByEmail(normalizedEmail);
 
     if (!existingUser) {
       // First-time login: create user with this password
@@ -59,10 +63,11 @@ export function createAuthRouter(
       const hash = await Bun.password.hash(password);
 
       // First-user auto-admin in open mode
-      const isFirstUser = registrationMode === 'open' && db.listUsers().length === 0;
+      const allUsers = await db.listUsers();
+      const isFirstUser = registrationMode === 'open' && allUsers.length === 0;
       const isAdmin = isFirstUser || (allowed?.isAdmin ?? false);
 
-      const newUser = db.createUser({
+      const newUser = await db.createUser({
         name,
         email: normalizedEmail,
         initials,
@@ -71,7 +76,7 @@ export function createAuthRouter(
       });
 
       req.session.userId = newUser.id;
-      hooks?.onUserCreated?.(newUser);
+      await hooks?.onUserCreated?.(newUser);
 
       return res.json({
         id: newUser.id,
@@ -86,7 +91,7 @@ export function createAuthRouter(
     if (!existingUser.passwordHash) {
       // User exists but has no password (e.g., created via OIDC) — set it now
       const hash = await Bun.password.hash(password);
-      db.updateUserPassword(existingUser.id, hash);
+      await db.updateUserPassword(existingUser.id, hash);
     } else {
       const valid = await Bun.password.verify(password, existingUser.passwordHash);
       if (!valid) {
@@ -162,33 +167,34 @@ export function createAuthRouter(
       }
 
       const normalizedEmail = email.trim().toLowerCase();
-      const registrationMode = db.getSetting('registration_mode') || 'open';
+      const registrationMode = await db.getSetting('registration_mode') || 'open';
 
       // Check allowlist (skip in open mode)
-      const allowed = db.findAllowedEmail(normalizedEmail);
+      const allowed = await db.findAllowedEmail(normalizedEmail);
       if (registrationMode === 'allowlist' && !allowed) {
         return res.redirect('/#login?error=not_authorized');
       }
 
       // Find or create user
-      let user = db.findUserByEmail(normalizedEmail);
+      let user = await db.findUserByEmail(normalizedEmail);
 
       if (!user) {
         const name = (claims?.name as string) || deriveNameFromEmail(normalizedEmail);
         const initials = generateInitials(name);
 
         // First-user auto-admin in open mode
-        const isFirstUser = registrationMode === 'open' && db.listUsers().length === 0;
+        const allUsers = await db.listUsers();
+        const isFirstUser = registrationMode === 'open' && allUsers.length === 0;
         const isAdmin = isFirstUser || (allowed?.isAdmin ?? false);
 
-        user = db.createUser({
+        user = await db.createUser({
           name,
           email: normalizedEmail,
           initials,
           isAdmin,
         });
 
-        hooks?.onUserCreated?.(user);
+        await hooks?.onUserCreated?.(user);
       }
 
       req.session.userId = user.id;

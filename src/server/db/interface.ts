@@ -33,24 +33,24 @@ export interface AllowedEmailWithStatus {
 
 export interface AuthDB {
   // User operations
-  findUserByEmail(email: string): AuthUser | null;
-  findUserById(id: number): AuthUser | null;
-  createUser(data: CreateUserData): AuthUser;
-  listUsers(): AuthUser[];
-  updateUserAdmin(id: number, isAdmin: boolean): void;
-  deleteUser(id: number): void;
-  updateUserPassword(id: number, hash: string): void;
+  findUserByEmail(email: string): Promise<AuthUser | null>;
+  findUserById(id: number): Promise<AuthUser | null>;
+  createUser(data: CreateUserData): Promise<AuthUser>;
+  listUsers(): Promise<AuthUser[]>;
+  updateUserAdmin(id: number, isAdmin: boolean): Promise<void>;
+  deleteUser(id: number): Promise<void>;
+  updateUserPassword(id: number, hash: string): Promise<void>;
 
   // Allowlist operations
-  findAllowedEmail(email: string): AllowedEmailRecord | null;
-  listAllowedEmails(): AllowedEmailWithStatus[];
-  addAllowedEmail(email: string, addedBy: number): { id: number; email: string };
-  removeAllowedEmail(id: number): { email: string } | null;
+  findAllowedEmail(email: string): Promise<AllowedEmailRecord | null>;
+  listAllowedEmails(): Promise<AllowedEmailWithStatus[]>;
+  addAllowedEmail(email: string, addedBy: number): Promise<{ id: number; email: string }>;
+  removeAllowedEmail(id: number): Promise<{ email: string } | null>;
 
   // Settings
-  getSetting(key: string): string | null;
-  setSetting(key: string, value: string): void;
+  getSetting(key: string): Promise<string | null>;
+  setSetting(key: string, value: string): Promise<void>;
 
   // Schema
-  initSchema(): void;
+  initSchema(): Promise<void>;
 }

@@ -122,6 +122,21 @@ export function UserManagementPanel({ extraColumns }: UserManagementPanelProps) 
     }
   };
 
+  const handleImpersonateAllowlistUser = async (ae: AllowedEmail) => {
+    try {
+      let userId = ae.userId;
+      if (!userId) {
+        // Pre-create the user first so we can impersonate
+        const created = await authApi.preCreateUser(ae.email) as any;
+        userId = created.id;
+      }
+      await authApi.impersonateUser(userId!);
+      window.location.href = '/';
+    } catch (err: any) {
+      alert(err.message);
+    }
+  };
+
   const handleRemoveEmail = async (id: number, email: string) => {
     if (!confirm(`Remove "${email}" from the allowlist?`)) return;
     try {
@@ -246,12 +261,20 @@ export function UserManagementPanel({ extraColumns }: UserManagementPanelProps) 
                 </td>
                 <td className="text-muted text-sm">{new Date(ae.createdAt).toLocaleDateString()}</td>
                 <td>
-                  <button
-                    className="btn btn-sm btn-danger"
-                    onClick={() => handleRemoveEmail(ae.id, ae.email)}
-                  >
-                    Remove
-                  </button>
+                  <div className="flex gap-sm">
+                    <button
+                      className="btn btn-sm btn-secondary"
+                      onClick={() => handleImpersonateAllowlistUser(ae)}
+                    >
+                      Impersonate
+                    </button>
+                    <button
+                      className="btn btn-sm btn-danger"
+                      onClick={() => handleRemoveEmail(ae.id, ae.email)}
+                    >
+                      Remove
+                    </button>
+                  </div>
                 </td>
               </tr>
             ))}

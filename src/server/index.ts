@@ -35,6 +35,11 @@ export function setupAuth(app: Express, config: AuthKitConfig): SetupAuthResult 
     }
   }
 
+  // Seed roles if provided
+  if (config.roles) {
+    config.db.seedRoles(config.roles.definitions, config.roles.seed ?? []);
+  }
+
   // Configure OIDC if provided
   if (config.oidc) {
     setOIDCConfig(config.oidc);
@@ -55,8 +60,8 @@ export function setupAuth(app: Express, config: AuthKitConfig): SetupAuthResult 
   );
 
   // Create or reuse middleware
-  const { requireAuth, requireAdmin } = config.middleware
-    ? config.middleware
+  const { requireAuth, requireAdmin, requireRole, requireAnyRole, requirePermission } = config.middleware
+    ? { ...config.middleware, ...createAuthMiddleware(config.db) }
     : createAuthMiddleware(config.db);
 
   // Create routers
@@ -70,11 +75,15 @@ export function setupAuth(app: Express, config: AuthKitConfig): SetupAuthResult 
 
   const adminAuthRouter = createAdminAuthRouter(config.db, requireAuth, requireAdmin, {
     onUserCreated: config.hooks?.onUserCreated,
+    permissionDefinitions: config.roles?.permissions,
   });
 
   return {
     requireAuth,
     requireAdmin,
+    requireRole,
+    requireAnyRole,
+    requirePermission,
     authRouter,
     usersRouter,
     adminAuthRouter,
@@ -84,5 +93,6 @@ export function setupAuth(app: Express, config: AuthKitConfig): SetupAuthResult 
 // Re-export everything consumers need
 export { createAuthMiddleware } from './middleware.js';
 export type { AuthRequest } from './middleware.js';
-export type { AuthKitConfig, SetupAuthResult, AuthDB, AuthUser, CreateUserData, AllowedEmailRecord, AllowedEmailWithStatus } from './types.js';
+export type { AuthKitConfig, SetupAuthResult, AuthDB, AuthUser, CreateUserData, AllowedEmailRecord, AllowedEmailWithStatus, Role, Permission, RoleSeed, RolesConfig } from './types.js';
 export { SqliteAuthDB } from './db/sqlite.js';
+export { PostgresAuthDB } from './db/postgres.js';

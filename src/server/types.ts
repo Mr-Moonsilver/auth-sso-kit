@@ -21,8 +21,8 @@ export interface AuthKitConfig {
     appUrl: string;
   };
   hooks?: {
-    onBeforeUserDelete?: (userId: number) => void;
-    onUserCreated?: (user: AuthUser) => void;
+    onBeforeUserDelete?: (userId: number) => void | Promise<void>;
+    onUserCreated?: (user: AuthUser) => void | Promise<void>;
   };
   seedEmails?: Array<{ email: string; isAdmin?: boolean }>;
   /** Default registration mode for fresh databases. Defaults to 'open'. */

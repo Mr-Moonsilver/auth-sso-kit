@@ -15,17 +15,20 @@ export function createUsersRouter(
   const router = Router();
 
   // Get all users
-  router.get('/', requireAuth as any, (req: AuthRequest, res: Response) => {
-    const users = db.listUsers();
-    const usersWithRoles = users.map((u) => ({
-      ...u,
-      roles: db.getUserRoles(u.id),
-    }));
+  router.get('/', requireAuth as any, async (req: AuthRequest, res: Response) => {
+    const users = await db.listUsers();
+    const usersWithRoles = [];
+    for (const u of users) {
+      usersWithRoles.push({
+        ...u,
+        roles: await db.getUserRoles(u.id),
+      });
+    }
     res.json(usersWithRoles);
   });
 
   // Toggle admin status
-  router.put('/:id/admin', requireAuth as any, requireAdmin as any, (req: AuthRequest, res: Response) => {
+  router.put('/:id/admin', requireAuth as any, requireAdmin as any, async (req: AuthRequest, res: Response) => {
     const { id } = req.params;
     const { isAdmin } = req.body;
 
@@ -33,27 +36,27 @@ export function createUsersRouter(
       return res.status(400).json({ error: 'Cannot remove your own admin status' });
     }
 
-    db.updateUserAdmin(Number(id), isAdmin);
+    await db.updateUserAdmin(Number(id), isAdmin);
     res.json({ success: true });
   });
 
   // Assign roles to user
-  router.put('/:id/roles', requireAuth as any, requireAdmin as any, (req: AuthRequest, res: Response) => {
+  router.put('/:id/roles', requireAuth as any, requireAdmin as any, async (req: AuthRequest, res: Response) => {
     const { id } = req.params;
     const { roleIds } = req.body;
     if (!Array.isArray(roleIds)) {
       return res.status(400).json({ error: 'roleIds array is required' });
     }
-    const user = db.findUserById(Number(id));
+    const user = await db.findUserById(Number(id));
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
     }
-    db.setUserRoles(Number(id), roleIds);
+    await db.setUserRoles(Number(id), roleIds);
     res.json({ success: true });
   });
 
   // Delete user
-  router.delete('/:id', requireAuth as any, requireAdmin as any, (req: AuthRequest, res: Response) => {
+  router.delete('/:id', requireAuth as any, requireAdmin as any, async (req: AuthRequest, res: Response) => {
     const { id } = req.params;
 
     if (Number(id) === req.user?.id) {
@@ -63,7 +66,7 @@ export function createUsersRouter(
     // Call hook so the app can clean up its own tables
     hooks?.onBeforeUserDelete?.(Number(id));
 
-    db.deleteUser(Number(id));
+    await db.deleteUser(Number(id));
     res.json({ success: true });
   });
 

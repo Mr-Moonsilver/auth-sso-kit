@@ -17,27 +17,25 @@ declare module 'express-session' {
   }
 }
 
-export function setupAuth(app: Express, config: AuthKitConfig): SetupAuthResult {
+export async function setupAuth(app: Express, config: AuthKitConfig): Promise<SetupAuthResult> {
   // Initialize DB schema
-  config.db.initSchema();
+  await config.db.initSchema();
 
   // Seed default registration mode if not already set
-  if (!config.db.getSetting('registration_mode')) {
-    config.db.setSetting('registration_mode', config.defaultRegistrationMode ?? 'open');
+  if (!await config.db.getSetting('registration_mode')) {
+    await config.db.setSetting('registration_mode', config.defaultRegistrationMode ?? 'open');
   }
 
   // Seed allowlist emails if provided
   if (config.seedEmails) {
     for (const seed of config.seedEmails) {
-      config.db.addAllowedEmail(seed.email, 0);
-      // If seed specifies admin, update the allowed_emails record
-      // (addAllowedEmail is idempotent — returns existing if already present)
+      await config.db.addAllowedEmail(seed.email, 0);
     }
   }
 
   // Seed roles if provided
   if (config.roles) {
-    config.db.seedRoles(config.roles.definitions, config.roles.seed ?? []);
+    await config.db.seedRoles(config.roles.definitions, config.roles.seed ?? []);
   }
 
   // Configure OIDC if provided

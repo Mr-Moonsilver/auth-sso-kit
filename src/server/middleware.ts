@@ -18,12 +18,12 @@ export interface AuthRequest extends Request {
 }
 
 export function createAuthMiddleware(db: AuthDB) {
-  function requireAuth(req: AuthRequest, res: Response, next: NextFunction) {
+  async function requireAuth(req: AuthRequest, res: Response, next: NextFunction) {
     if (!req.session.userId) {
       return res.status(401).json({ error: 'Not authenticated' });
     }
 
-    const user = db.findUserById(req.session.userId);
+    const user = await db.findUserById(req.session.userId);
 
     if (!user) {
       req.session.destroy(() => {});
@@ -33,9 +33,9 @@ export function createAuthMiddleware(db: AuthDB) {
     // Handle impersonation
     if (req.session.impersonateUserId) {
       if (user.isAdmin) {
-        const impersonated = db.findUserById(req.session.impersonateUserId);
+        const impersonated = await db.findUserById(req.session.impersonateUserId);
         if (impersonated) {
-          const impersonatedRoles = db.getUserRoles(impersonated.id);
+          const impersonatedRoles = await db.getUserRoles(impersonated.id);
           req.user = {
             id: impersonated.id,
             name: impersonated.name,
@@ -59,7 +59,7 @@ export function createAuthMiddleware(db: AuthDB) {
       }
     }
 
-    const roles = db.getUserRoles(user.id);
+    const roles = await db.getUserRoles(user.id);
     req.user = {
       id: user.id,
       name: user.name,
@@ -97,12 +97,12 @@ export function createAuthMiddleware(db: AuthDB) {
     };
   }
 
-  function requirePermission(permission: string) {
-    return (req: AuthRequest, res: Response, next: NextFunction) => {
+  async function requirePermission(permission: string) {
+    return async (req: AuthRequest, res: Response, next: NextFunction) => {
       if (!req.user) {
         return res.status(401).json({ error: 'Not authenticated' });
       }
-      const permissions = db.getUserPermissions(req.user.id);
+      const permissions = await db.getUserPermissions(req.user.id);
       if (!permissions.includes(permission)) {
         return res.status(403).json({ error: `Permission "${permission}" required` });
       }

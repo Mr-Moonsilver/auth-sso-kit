@@ -50,37 +50,37 @@ export interface RoleSeed {
 
 export interface AuthDB {
   // User operations
-  findUserByEmail(email: string): AuthUser | null;
-  findUserById(id: number): AuthUser | null;
-  createUser(data: CreateUserData): AuthUser;
-  listUsers(): AuthUser[];
-  updateUserAdmin(id: number, isAdmin: boolean): void;
-  deleteUser(id: number): void;
-  updateUserPassword(id: number, hash: string): void;
+  findUserByEmail(email: string): AuthUser | null | Promise<AuthUser | null>;
+  findUserById(id: number): AuthUser | null | Promise<AuthUser | null>;
+  createUser(data: CreateUserData): AuthUser | Promise<AuthUser>;
+  listUsers(): AuthUser[] | Promise<AuthUser[]>;
+  updateUserAdmin(id: number, isAdmin: boolean): void | Promise<void>;
+  deleteUser(id: number): void | Promise<void>;
+  updateUserPassword(id: number, hash: string): void | Promise<void>;
 
   // Allowlist operations
-  findAllowedEmail(email: string): AllowedEmailRecord | null;
-  listAllowedEmails(): AllowedEmailWithStatus[];
-  addAllowedEmail(email: string, addedBy: number): { id: number; email: string };
-  removeAllowedEmail(id: number): { email: string } | null;
+  findAllowedEmail(email: string): AllowedEmailRecord | null | Promise<AllowedEmailRecord | null>;
+  listAllowedEmails(): AllowedEmailWithStatus[] | Promise<AllowedEmailWithStatus[]>;
+  addAllowedEmail(email: string, addedBy: number): { id: number; email: string } | Promise<{ id: number; email: string }>;
+  removeAllowedEmail(id: number): { email: string } | null | Promise<{ email: string } | null>;
 
   // Settings
-  getSetting(key: string): string | null;
-  setSetting(key: string, value: string): void;
+  getSetting(key: string): string | null | Promise<string | null>;
+  setSetting(key: string, value: string): void | Promise<void>;
 
   // Schema
-  initSchema(): void;
+  initSchema(): void | Promise<void>;
 
   // Roles
-  createRole(name: string, description: string): Role;
-  listRoles(): Role[];
-  getRole(id: number): Role | null;
-  updateRole(id: number, name: string, description: string): void;
-  deleteRole(id: number): void;
-  getUserRoles(userId: number): string[];
-  setUserRoles(userId: number, roleIds: number[]): void;
-  getRolePermissions(roleId: number): Permission[];
-  setRolePermissions(roleId: number, permissions: { key: string; enabled: boolean }[]): void;
-  getUserPermissions(userId: number): string[];
-  seedRoles(definitions: string[], seeds: RoleSeed[]): void;
+  createRole(name: string, description: string): Role | Promise<Role>;
+  listRoles(): Role[] | Promise<Role[]>;
+  getRole(id: number): Role | null | Promise<Role | null>;
+  updateRole(id: number, name: string, description: string): void | Promise<void>;
+  deleteRole(id: number): void | Promise<void>;
+  getUserRoles(userId: number): string[] | Promise<string[]>;
+  setUserRoles(userId: number, roleIds: number[]): void | Promise<void>;
+  getRolePermissions(roleId: number): Permission[] | Promise<Permission[]>;
+  setRolePermissions(roleId: number, permissions: { key: string; enabled: boolean }[]): void | Promise<void>;
+  getUserPermissions(userId: number): string[] | Promise<string[]>;
+  seedRoles(definitions: string[], seeds: RoleSeed[]): void | Promise<void>;
 }

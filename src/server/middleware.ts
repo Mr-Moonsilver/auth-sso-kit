@@ -97,7 +97,7 @@ export function createAuthMiddleware(db: AuthDB) {
     };
   }
 
-  async function requirePermission(permission: string) {
+  function requirePermission(permission: string) {
     return async (req: AuthRequest, res: Response, next: NextFunction) => {
       if (!req.user) {
         return res.status(401).json({ error: 'Not authenticated' });

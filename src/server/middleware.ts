@@ -8,6 +8,7 @@ export interface AuthRequest extends Request {
     email: string;
     initials: string;
     isAdmin: boolean;
+    roles: string[];
   };
   impersonatedBy?: {
     id: number;
@@ -34,12 +35,14 @@ export function createAuthMiddleware(db: AuthDB) {
       if (user.isAdmin) {
         const impersonated = db.findUserById(req.session.impersonateUserId);
         if (impersonated) {
+          const impersonatedRoles = db.getUserRoles(impersonated.id);
           req.user = {
             id: impersonated.id,
             name: impersonated.name,
             email: impersonated.email,
             initials: impersonated.initials,
             isAdmin: impersonated.isAdmin,
+            roles: impersonatedRoles,
           };
           req.impersonatedBy = {
             id: user.id,
@@ -56,12 +59,14 @@ export function createAuthMiddleware(db: AuthDB) {
       }
     }
 
+    const roles = db.getUserRoles(user.id);
     req.user = {
       id: user.id,
       name: user.name,
       email: user.email,
       initials: user.initials,
       isAdmin: user.isAdmin,
+      roles,
     };
 
     next();
@@ -74,5 +79,36 @@ export function createAuthMiddleware(db: AuthDB) {
     next();
   }
 
-  return { requireAuth, requireAdmin };
+  function requireRole(role: string) {
+    return (req: AuthRequest, res: Response, next: NextFunction) => {
+      if (!req.user?.roles?.includes(role)) {
+        return res.status(403).json({ error: `Role "${role}" required` });
+      }
+      next();
+    };
+  }
+
+  function requireAnyRole(roles: string[]) {
+    return (req: AuthRequest, res: Response, next: NextFunction) => {
+      if (!req.user?.roles?.some((r) => roles.includes(r))) {
+        return res.status(403).json({ error: `One of roles [${roles.join(', ')}] required` });
+      }
+      next();
+    };
+  }
+
+  function requirePermission(permission: string) {
+    return (req: AuthRequest, res: Response, next: NextFunction) => {
+      if (!req.user) {
+        return res.status(401).json({ error: 'Not authenticated' });
+      }
+      const permissions = db.getUserPermissions(req.user.id);
+      if (!permissions.includes(permission)) {
+        return res.status(403).json({ error: `Permission "${permission}" required` });
+      }
+      next();
+    };
+  }
+
+  return { requireAuth, requireAdmin, requireRole, requireAnyRole, requirePermission };
 }

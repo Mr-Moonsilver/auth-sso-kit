@@ -57,4 +57,22 @@ export const authApi = {
   getRegistrationMode: () => request<{ mode: 'open' | 'allowlist' }>('/admin/registration-mode'),
   setRegistrationMode: (mode: 'open' | 'allowlist') =>
     request('/admin/registration-mode', { method: 'PUT', body: JSON.stringify({ mode }) }),
+
+  // Admin — Roles
+  getRoles: () => request('/admin/roles'),
+  createRole: (name: string, description: string) =>
+    request('/admin/roles', { method: 'POST', body: JSON.stringify({ name, description }) }),
+  updateRole: (id: number, name: string, description: string) =>
+    request(`/admin/roles/${id}`, { method: 'PUT', body: JSON.stringify({ name, description }) }),
+  deleteRole: (id: number) =>
+    request(`/admin/roles/${id}`, { method: 'DELETE' }),
+  getRolePermissions: (roleId: number) =>
+    request(`/admin/roles/${roleId}/permissions`),
+  updateRolePermissions: (roleId: number, permissions: { key: string; enabled: boolean }[]) =>
+    request(`/admin/roles/${roleId}/permissions`, { method: 'PUT', body: JSON.stringify({ permissions }) }),
+  getPermissionDefinitions: () => request<string[]>('/admin/permissions'),
+
+  // Admin — User Roles
+  updateUserRoles: (userId: number, roleIds: number[]) =>
+    request(`/users/${userId}/roles`, { method: 'PUT', body: JSON.stringify({ roleIds }) }),
 };

@@ -31,6 +31,23 @@ export interface AllowedEmailWithStatus {
   userName: string | null;
 }
 
+export interface Role {
+  id: number;
+  name: string;
+  description: string | null;
+}
+
+export interface Permission {
+  id: number;
+  permission_key: string;
+  enabled: boolean;
+}
+
+export interface RoleSeed {
+  role: string;
+  permissions: string[];
+}
+
 export interface AuthDB {
   // User operations
   findUserByEmail(email: string): AuthUser | null;
@@ -53,4 +70,17 @@ export interface AuthDB {
 
   // Schema
   initSchema(): void;
+
+  // Roles
+  createRole(name: string, description: string): Role;
+  listRoles(): Role[];
+  getRole(id: number): Role | null;
+  updateRole(id: number, name: string, description: string): void;
+  deleteRole(id: number): void;
+  getUserRoles(userId: number): string[];
+  setUserRoles(userId: number, roleIds: number[]): void;
+  getRolePermissions(roleId: number): Permission[];
+  setRolePermissions(roleId: number, permissions: { key: string; enabled: boolean }[]): void;
+  getUserPermissions(userId: number): string[];
+  seedRoles(definitions: string[], seeds: RoleSeed[]): void;
 }

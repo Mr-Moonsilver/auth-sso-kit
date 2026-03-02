@@ -1,7 +1,7 @@
 import { useState, useEffect, ReactNode } from 'react';
 import { authApi } from '../api.js';
 import { useAuth } from '../context/AuthContext.js';
-import type { User, AllowedEmail } from '../types.js';
+import type { User, AllowedEmail, Role } from '../types.js';
 
 export interface UserManagementPanelProps {
   /** Add extra columns to the user table */
@@ -16,7 +16,10 @@ export function UserManagementPanel({ extraColumns }: UserManagementPanelProps) 
 
   const [users, setUsers] = useState<User[]>([]);
   const [allowedEmails, setAllowedEmails] = useState<AllowedEmail[]>([]);
+  const [availableRoles, setAvailableRoles] = useState<Role[]>([]);
   const [loading, setLoading] = useState(true);
+  const [roleEditUserId, setRoleEditUserId] = useState<number | null>(null);
+  const [selectedRoleIds, setSelectedRoleIds] = useState<number[]>([]);
 
   // Email allowlist / pre-create state
   const [newEmail, setNewEmail] = useState('');
@@ -36,14 +39,16 @@ export function UserManagementPanel({ extraColumns }: UserManagementPanelProps) 
 
   const loadData = async () => {
     try {
-      const [usersData, emailsData, modeData] = await Promise.all([
+      const [usersData, emailsData, modeData, rolesData] = await Promise.all([
         authApi.getUsers() as Promise<User[]>,
         authApi.getAllowedEmails() as Promise<AllowedEmail[]>,
         authApi.getRegistrationMode().catch(() => ({ mode: 'open' as const })),
+        authApi.getRoles().catch(() => []) as Promise<Role[]>,
       ]);
       setUsers(usersData);
       setAllowedEmails(emailsData);
       setRegMode(modeData.mode);
+      setAvailableRoles(rolesData);
     } catch (err) {
       console.error(err);
     } finally {
@@ -142,6 +147,28 @@ export function UserManagementPanel({ extraColumns }: UserManagementPanelProps) 
       setResetUserId(null);
       setResetPassword('');
       alert('Password reset successfully');
+    } catch (err: any) {
+      alert(err.message);
+    }
+  };
+
+  const handleOpenRoleEdit = (userId: number, userRoles: string[]) => {
+    setRoleEditUserId(userId);
+    const ids = availableRoles.filter((r) => userRoles.includes(r.name)).map((r) => r.id);
+    setSelectedRoleIds(ids);
+  };
+
+  const handleToggleRoleSelection = (roleId: number) => {
+    setSelectedRoleIds((prev) =>
+      prev.includes(roleId) ? prev.filter((id) => id !== roleId) : [...prev, roleId]
+    );
+  };
+
+  const handleSaveUserRoles = async (userId: number) => {
+    try {
+      await authApi.updateUserRoles(userId, selectedRoleIds);
+      setRoleEditUserId(null);
+      loadData();
     } catch (err: any) {
       alert(err.message);
     }
@@ -286,11 +313,16 @@ export function UserManagementPanel({ extraColumns }: UserManagementPanelProps) 
                 </td>
                 <td className="text-sm text-muted">{u.email || '\u2014'}</td>
                 <td>
-                  {u.isAdmin ? (
-                    <span className="badge badge-primary">Admin</span>
-                  ) : (
-                    <span className="badge">User</span>
-                  )}
+                  <div className="flex gap-sm flex-wrap">
+                    {u.isAdmin ? (
+                      <span className="badge badge-primary">Admin</span>
+                    ) : (
+                      <span className="badge">User</span>
+                    )}
+                    {(u.roles ?? []).map((role) => (
+                      <span key={role} className="badge badge-secondary">{role}</span>
+                    ))}
+                  </div>
                 </td>
                 {extraColumns?.map((col) => (
                   <td key={col.header}>{col.render(u)}</td>
@@ -313,6 +345,20 @@ export function UserManagementPanel({ extraColumns }: UserManagementPanelProps) 
                       >
                         Impersonate
                       </button>
+                      {availableRoles.length > 0 && (
+                        <button
+                          className="btn btn-sm btn-secondary"
+                          onClick={() => {
+                            if (roleEditUserId === u.id) {
+                              setRoleEditUserId(null);
+                            } else {
+                              handleOpenRoleEdit(u.id, u.roles ?? []);
+                            }
+                          }}
+                        >
+                          Roles
+                        </button>
+                      )}
                       {authMethod === 'password' && (
                         <button
                           className="btn btn-sm btn-secondary"
@@ -347,6 +393,28 @@ export function UserManagementPanel({ extraColumns }: UserManagementPanelProps) 
                         onClick={() => handleResetPassword(u.id)}
                       >
                         Set
+                      </button>
+                    </div>
+                  )}
+                  {roleEditUserId === u.id && (
+                    <div className="mt-sm">
+                      <div className="flex gap-sm flex-wrap mb-sm">
+                        {availableRoles.map((role) => (
+                          <label key={role.id} className="flex items-center gap-sm" style={{ fontSize: '0.85rem' }}>
+                            <input
+                              type="checkbox"
+                              checked={selectedRoleIds.includes(role.id)}
+                              onChange={() => handleToggleRoleSelection(role.id)}
+                            />
+                            {role.name}
+                          </label>
+                        ))}
+                      </div>
+                      <button
+                        className="btn btn-sm btn-primary"
+                        onClick={() => handleSaveUserRoles(u.id)}
+                      >
+                        Save Roles
                       </button>
                     </div>
                   )}

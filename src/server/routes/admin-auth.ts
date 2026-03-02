@@ -5,6 +5,7 @@ import { generateInitials, deriveNameFromEmail } from '../utils.js';
 
 export interface AdminAuthRouterHooks {
   onUserCreated?: (user: AuthUser) => void;
+  permissionDefinitions?: string[];
 }
 
 export function createAdminAuthRouter(
@@ -164,6 +165,95 @@ export function createAdminAuthRouter(
     const hash = await Bun.password.hash(password);
     db.updateUserPassword(Number(id), hash);
     res.json({ success: true });
+  });
+
+  // --- Roles ---
+
+  // List all roles
+  router.get('/roles', requireAuth as any, requireAdmin as any, (_req: AuthRequest, res: Response) => {
+    const roles = db.listRoles();
+    res.json(roles);
+  });
+
+  // Create role
+  router.post('/roles', requireAuth as any, requireAdmin as any, (req: AuthRequest, res: Response) => {
+    const { name, description } = req.body;
+    if (!name || typeof name !== 'string' || !name.trim()) {
+      return res.status(400).json({ error: 'Role name is required' });
+    }
+    try {
+      const role = db.createRole(name.trim(), description || '');
+      res.json(role);
+    } catch (err: any) {
+      if (err.message?.includes('UNIQUE constraint')) {
+        return res.status(409).json({ error: 'Role name already exists' });
+      }
+      throw err;
+    }
+  });
+
+  // Update role
+  router.put('/roles/:id', requireAuth as any, requireAdmin as any, (req: AuthRequest, res: Response) => {
+    const { id } = req.params;
+    const { name, description } = req.body;
+    if (!name || typeof name !== 'string' || !name.trim()) {
+      return res.status(400).json({ error: 'Role name is required' });
+    }
+    const role = db.getRole(Number(id));
+    if (!role) {
+      return res.status(404).json({ error: 'Role not found' });
+    }
+    try {
+      db.updateRole(Number(id), name.trim(), description || '');
+      res.json({ success: true });
+    } catch (err: any) {
+      if (err.message?.includes('UNIQUE constraint')) {
+        return res.status(409).json({ error: 'Role name already exists' });
+      }
+      throw err;
+    }
+  });
+
+  // Delete role
+  router.delete('/roles/:id', requireAuth as any, requireAdmin as any, (req: AuthRequest, res: Response) => {
+    const { id } = req.params;
+    const role = db.getRole(Number(id));
+    if (!role) {
+      return res.status(404).json({ error: 'Role not found' });
+    }
+    db.deleteRole(Number(id));
+    res.json({ success: true });
+  });
+
+  // Get permissions for a role
+  router.get('/roles/:id/permissions', requireAuth as any, requireAdmin as any, (req: AuthRequest, res: Response) => {
+    const { id } = req.params;
+    const role = db.getRole(Number(id));
+    if (!role) {
+      return res.status(404).json({ error: 'Role not found' });
+    }
+    const permissions = db.getRolePermissions(Number(id));
+    res.json(permissions);
+  });
+
+  // Update permissions for a role
+  router.put('/roles/:id/permissions', requireAuth as any, requireAdmin as any, (req: AuthRequest, res: Response) => {
+    const { id } = req.params;
+    const { permissions } = req.body;
+    if (!Array.isArray(permissions)) {
+      return res.status(400).json({ error: 'permissions array is required' });
+    }
+    const role = db.getRole(Number(id));
+    if (!role) {
+      return res.status(404).json({ error: 'Role not found' });
+    }
+    db.setRolePermissions(Number(id), permissions);
+    res.json({ success: true });
+  });
+
+  // Get available permission definitions
+  router.get('/permissions', requireAuth as any, requireAdmin as any, (_req: AuthRequest, res: Response) => {
+    res.json(hooks?.permissionDefinitions ?? []);
   });
 
   return router;

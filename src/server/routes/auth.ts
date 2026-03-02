@@ -208,6 +208,11 @@ export function createAuthRouter(
     if (req.impersonatedBy) {
       data.impersonatedBy = req.impersonatedBy;
     }
+    // Include roles (already on req.user) and permissions
+    if (req.user) {
+      data.roles = req.user.roles;
+      data.permissions = db.getUserPermissions(req.user.id);
+    }
     res.json(data);
   });
 

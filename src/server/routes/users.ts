@@ -17,7 +17,11 @@ export function createUsersRouter(
   // Get all users
   router.get('/', requireAuth as any, (req: AuthRequest, res: Response) => {
     const users = db.listUsers();
-    res.json(users);
+    const usersWithRoles = users.map((u) => ({
+      ...u,
+      roles: db.getUserRoles(u.id),
+    }));
+    res.json(usersWithRoles);
   });
 
   // Toggle admin status
@@ -30,6 +34,21 @@ export function createUsersRouter(
     }
 
     db.updateUserAdmin(Number(id), isAdmin);
+    res.json({ success: true });
+  });
+
+  // Assign roles to user
+  router.put('/:id/roles', requireAuth as any, requireAdmin as any, (req: AuthRequest, res: Response) => {
+    const { id } = req.params;
+    const { roleIds } = req.body;
+    if (!Array.isArray(roleIds)) {
+      return res.status(400).json({ error: 'roleIds array is required' });
+    }
+    const user = db.findUserById(Number(id));
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    db.setUserRoles(Number(id), roleIds);
     res.json({ success: true });
   });
 

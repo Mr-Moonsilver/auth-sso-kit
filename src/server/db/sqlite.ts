@@ -2,7 +2,7 @@ import { Database } from 'bun:sqlite';
 import { readFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
-import type { AuthDB, AuthUser, CreateUserData, AllowedEmailRecord, AllowedEmailWithStatus } from './interface.js';
+import type { AuthDB, AuthUser, CreateUserData, AllowedEmailRecord, AllowedEmailWithStatus, Role, Permission, RoleSeed } from './interface.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -143,5 +143,99 @@ export class SqliteAuthDB implements AuthDB {
 
     this.db.prepare('DELETE FROM allowed_emails WHERE id = ?').run(id);
     return entry;
+  }
+
+  createRole(name: string, description: string): Role {
+    const result = this.db.prepare(
+      'INSERT INTO roles (name, description) VALUES (?, ?)'
+    ).run(name, description);
+    return { id: result.lastInsertRowid as number, name, description };
+  }
+
+  listRoles(): Role[] {
+    return this.db.prepare('SELECT id, name, description FROM roles ORDER BY name').all() as Role[];
+  }
+
+  getRole(id: number): Role | null {
+    const row = this.db.prepare('SELECT id, name, description FROM roles WHERE id = ?').get(id) as Role | undefined;
+    return row ?? null;
+  }
+
+  updateRole(id: number, name: string, description: string): void {
+    this.db.prepare('UPDATE roles SET name = ?, description = ? WHERE id = ?').run(name, description, id);
+  }
+
+  deleteRole(id: number): void {
+    this.db.prepare('DELETE FROM roles WHERE id = ?').run(id);
+  }
+
+  getUserRoles(userId: number): string[] {
+    const rows = this.db.prepare(
+      'SELECT r.name FROM user_roles ur JOIN roles r ON r.id = ur.role_id WHERE ur.user_id = ?'
+    ).all(userId) as { name: string }[];
+    return rows.map((r) => r.name);
+  }
+
+  setUserRoles(userId: number, roleIds: number[]): void {
+    const tx = this.db.transaction(() => {
+      this.db.prepare('DELETE FROM user_roles WHERE user_id = ?').run(userId);
+      const insert = this.db.prepare('INSERT INTO user_roles (user_id, role_id) VALUES (?, ?)');
+      for (const roleId of roleIds) {
+        insert.run(userId, roleId);
+      }
+    });
+    tx();
+  }
+
+  getRolePermissions(roleId: number): Permission[] {
+    const rows = this.db.prepare(
+      'SELECT id, permission_key, enabled FROM permissions WHERE role_id = ?'
+    ).all(roleId) as any[];
+    return rows.map((r) => ({ ...r, enabled: Boolean(r.enabled) }));
+  }
+
+  setRolePermissions(roleId: number, permissions: { key: string; enabled: boolean }[]): void {
+    const tx = this.db.transaction(() => {
+      this.db.prepare('DELETE FROM permissions WHERE role_id = ?').run(roleId);
+      const insert = this.db.prepare(
+        'INSERT INTO permissions (role_id, permission_key, enabled) VALUES (?, ?, ?)'
+      );
+      for (const p of permissions) {
+        insert.run(roleId, p.key, p.enabled ? 1 : 0);
+      }
+    });
+    tx();
+  }
+
+  getUserPermissions(userId: number): string[] {
+    const rows = this.db.prepare(`
+      SELECT DISTINCT p.permission_key
+      FROM user_roles ur
+      JOIN permissions p ON p.role_id = ur.role_id
+      WHERE ur.user_id = ? AND p.enabled = 1
+    `).all(userId) as { permission_key: string }[];
+    return rows.map((r) => r.permission_key);
+  }
+
+  seedRoles(definitions: string[], seeds: RoleSeed[]): void {
+    const tx = this.db.transaction(() => {
+      const insertRole = this.db.prepare('INSERT OR IGNORE INTO roles (name, description) VALUES (?, ?)');
+      for (const def of definitions) {
+        insertRole.run(def, '');
+      }
+
+      for (const seed of seeds) {
+        const role = this.db.prepare('SELECT id FROM roles WHERE name = ?').get(seed.role) as { id: number } | undefined;
+        if (!role) continue;
+
+        const insertPerm = this.db.prepare(
+          'INSERT OR REPLACE INTO permissions (role_id, permission_key, enabled) VALUES (?, ?, 1)'
+        );
+        for (const perm of seed.permissions) {
+          insertPerm.run(role.id, perm);
+        }
+      }
+    });
+    tx();
   }
 }

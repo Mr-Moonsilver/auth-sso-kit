@@ -13,6 +13,9 @@ interface AuthContextValue {
   logout: () => Promise<void>;
   stopImpersonating: () => Promise<void>;
   isAdmin: boolean;
+  roles: string[];
+  hasRole: (role: string) => boolean;
+  hasPermission: (permission: string) => boolean;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -56,11 +59,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const impersonatedBy = user?.impersonatedBy ?? null;
+  const roles = user?.roles ?? [];
+  const hasRole = (role: string) => roles.includes(role);
+  const hasPermission = (permission: string) => (user?.permissions ?? []).includes(permission);
 
   return (
     <AuthContext.Provider value={{
       user, loading, authMethod, registrationMode, impersonatedBy, login, loginWithOIDC, logout, stopImpersonating,
       isAdmin: user?.isAdmin ?? false,
+      roles,
+      hasRole,
+      hasPermission,
     }}>
       {children}
     </AuthContext.Provider>

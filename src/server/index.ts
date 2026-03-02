@@ -93,4 +93,4 @@ export { createAuthMiddleware } from './middleware.js';
 export type { AuthRequest } from './middleware.js';
 export type { AuthKitConfig, SetupAuthResult, AuthDB, AuthUser, CreateUserData, AllowedEmailRecord, AllowedEmailWithStatus, Role, Permission, RoleSeed, RolesConfig } from './types.js';
 export { SqliteAuthDB } from './db/sqlite.js';
-export { PostgresAuthDB } from './db/postgres.js';
+// PostgresAuthDB: import directly from 'auth-sso-kit/server/db/postgres.js' to avoid transitive pg dependency

@@ -148,7 +148,36 @@ export function createAdminAuthRouter(
     });
   });
 
-  // Reset user password (password mode only)
+  // Change own password (any authenticated user)
+  router.put('/users/me/password', requireAuth as any, async (req: AuthRequest, res: Response) => {
+    const { currentPassword, newPassword } = req.body;
+
+    if (!newPassword || typeof newPassword !== 'string' || newPassword.length < 8) {
+      return res.status(400).json({ error: 'New password must be at least 8 characters' });
+    }
+
+    const user = await db.findUserById(req.user!.id);
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    // If user already has a password, verify the current one
+    if (user.passwordHash) {
+      if (!currentPassword || typeof currentPassword !== 'string') {
+        return res.status(400).json({ error: 'Current password is required' });
+      }
+      const valid = await Bun.password.verify(currentPassword, user.passwordHash);
+      if (!valid) {
+        return res.status(401).json({ error: 'Current password is incorrect' });
+      }
+    }
+
+    const hash = await Bun.password.hash(newPassword);
+    await db.updateUserPassword(req.user!.id, hash);
+    res.json({ success: true });
+  });
+
+  // Reset user password (admin only)
   router.put('/users/:id/reset-password', requireAuth as any, requireAdmin as any, async (req: AuthRequest, res: Response) => {
     const { id } = req.params;
     const { password } = req.body;

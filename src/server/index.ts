@@ -52,6 +52,7 @@ export async function setupAuth(app: Express, config: AuthKitConfig): Promise<Se
       cookie: {
         secure: config.session.secure ?? false,
         httpOnly: true,
+        sameSite: 'lax',
         maxAge: config.session.maxAge ?? 24 * 60 * 60 * 1000,
       },
     })

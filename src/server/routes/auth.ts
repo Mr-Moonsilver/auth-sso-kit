@@ -5,6 +5,48 @@ import type { AuthRequest } from '../middleware.js';
 import { isOIDCEnabled, getAppUrl, getRedirectUri, getOIDCConfig } from '../oidc.js';
 import { generateInitials, deriveNameFromEmail } from '../utils.js';
 
+// ── In-memory rate limiter for login ──
+const loginAttempts = new Map<string, { count: number; firstAttempt: number }>();
+const RATE_LIMIT_MAX = 5;         // max attempts per window
+const RATE_LIMIT_WINDOW = 15 * 60 * 1000; // 15 minutes
+
+function getRateLimitKey(req: Request): string {
+  // Trust X-Forwarded-For if trust proxy is set, otherwise use socket IP
+  return (req.ip || req.socket.remoteAddress || 'unknown');
+}
+
+function checkLoginRateLimit(req: Request, res: Response): boolean {
+  const key = getRateLimitKey(req);
+  const now = Date.now();
+  const entry = loginAttempts.get(key);
+
+  if (!entry || now - entry.firstAttempt > RATE_LIMIT_WINDOW) {
+    loginAttempts.set(key, { count: 1, firstAttempt: now });
+    return true;
+  }
+
+  entry.count++;
+
+  if (entry.count > RATE_LIMIT_MAX) {
+    const retryAfter = Math.ceil((entry.firstAttempt + RATE_LIMIT_WINDOW - now) / 1000);
+    res.set('Retry-After', String(retryAfter));
+    res.status(429).json({ error: 'Too many login attempts. Please try again later.' });
+    return false;
+  }
+
+  return true;
+}
+
+// Cleanup stale entries every 30 minutes
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, entry] of loginAttempts) {
+    if (now - entry.firstAttempt > RATE_LIMIT_WINDOW) {
+      loginAttempts.delete(key);
+    }
+  }
+}, 30 * 60 * 1000);
+
 export interface AuthRouterHooks {
   onUserCreated?: (user: AuthUser) => void;
 }
@@ -30,6 +72,9 @@ export function createAuthRouter(
     if (isOIDCEnabled()) {
       return res.status(400).json({ error: 'Password login is disabled when SSO is enabled' });
     }
+
+    // Rate limit: 5 attempts per 15 minutes per IP
+    if (!checkLoginRateLimit(req, res)) return;
 
     const { email, password } = req.body;
 

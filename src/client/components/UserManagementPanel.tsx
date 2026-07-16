@@ -3,15 +3,109 @@ import { authApi } from '../api.js';
 import { useAuth } from '../context/AuthContext.js';
 import type { User, AllowedEmail, Role } from '../types.js';
 
+/**
+ * All user-facing strings of the panel. Override any subset via the `labels`
+ * prop (e.g. for i18n). Templates use `{name}` / `{email}` placeholders.
+ */
+export interface UserManagementPanelLabels {
+  regModeTitle: string;
+  regModeOpen: string;
+  regModeAllowlist: string;
+  regModeOpenHelp: string;
+  regModeAllowlistHelp: string;
+  allowlistTitle: string;
+  allowlistNotEnforced: string;
+  allowlistHelpEnforced: string;
+  allowlistHelpNotEnforced: string;
+  emailPlaceholder: string;
+  namePlaceholder: string;
+  addToAllowlist: string;
+  createAccount: string;
+  errValidEmailRequired: string;
+  colEmail: string;
+  colStatus: string;
+  colAdded: string;
+  /** `{name}` → registered user's name */
+  statusRegistered: string;
+  statusPending: string;
+  impersonate: string;
+  remove: string;
+  /** `{email}` → allowlist email */
+  confirmRemoveEmail: string;
+  userMgmtTitle: string;
+  colUser: string;
+  colRole: string;
+  colJoined: string;
+  badgeAdmin: string;
+  badgeUser: string;
+  removeAdmin: string;
+  makeAdmin: string;
+  rolesButton: string;
+  resetPassword: string;
+  deleteButton: string;
+  /** `{name}` → user's name */
+  confirmDeleteUser: string;
+  newPasswordPlaceholder: string;
+  setButton: string;
+  saveRoles: string;
+  errPasswordMin: string;
+  passwordResetDone: string;
+}
+
+export const defaultUserManagementPanelLabels: UserManagementPanelLabels = {
+  regModeTitle: 'Registration Mode',
+  regModeOpen: 'Open',
+  regModeAllowlist: 'Allowlist',
+  regModeOpenHelp: 'Anyone with a valid email can register. The first user becomes admin.',
+  regModeAllowlistHelp: 'Only pre-approved emails can log in.',
+  allowlistTitle: 'Email Allowlist',
+  allowlistNotEnforced: 'The allowlist is not currently enforced. Switch to Allowlist mode to restrict registration.',
+  allowlistHelpEnforced: 'Only these email addresses can log in. Add emails before users authenticate.',
+  allowlistHelpNotEnforced: 'Manage emails for when you switch to Allowlist mode.',
+  emailPlaceholder: 'email@example.com',
+  namePlaceholder: 'Name (optional)',
+  addToAllowlist: 'Add to Allowlist',
+  createAccount: 'Create Account',
+  errValidEmailRequired: 'Valid email is required',
+  colEmail: 'Email',
+  colStatus: 'Status',
+  colAdded: 'Added',
+  statusRegistered: 'Registered ({name})',
+  statusPending: 'Pending',
+  impersonate: 'Impersonate',
+  remove: 'Remove',
+  confirmRemoveEmail: 'Remove "{email}" from the allowlist?',
+  userMgmtTitle: 'User Management',
+  colUser: 'User',
+  colRole: 'Role',
+  colJoined: 'Joined',
+  badgeAdmin: 'Admin',
+  badgeUser: 'User',
+  removeAdmin: 'Remove Admin',
+  makeAdmin: 'Make Admin',
+  rolesButton: 'Roles',
+  resetPassword: 'Reset Password',
+  deleteButton: 'Delete',
+  confirmDeleteUser: 'Delete user "{name}"? This will also delete all their data.',
+  newPasswordPlaceholder: 'New password (min 8 chars)',
+  setButton: 'Set',
+  saveRoles: 'Save Roles',
+  errPasswordMin: 'Password must be at least 8 characters',
+  passwordResetDone: 'Password reset successfully',
+};
+
 export interface UserManagementPanelProps {
   /** Add extra columns to the user table */
   extraColumns?: Array<{
     header: string;
     render: (user: User) => ReactNode;
   }>;
+  /** Override any user-facing string (e.g. for i18n). */
+  labels?: Partial<UserManagementPanelLabels>;
 }
 
-export function UserManagementPanel({ extraColumns }: UserManagementPanelProps) {
+export function UserManagementPanel({ extraColumns, labels }: UserManagementPanelProps) {
+  const L: UserManagementPanelLabels = { ...defaultUserManagementPanelLabels, ...labels };
   const { user: currentUser, authMethod } = useAuth();
 
   const [users, setUsers] = useState<User[]>([]);
@@ -84,7 +178,7 @@ export function UserManagementPanel({ extraColumns }: UserManagementPanelProps) 
   };
 
   const handleDeleteUser = async (userId: number, userName: string) => {
-    if (!confirm(`Delete user "${userName}"? This will also delete all their data.`)) return;
+    if (!confirm(L.confirmDeleteUser.replace('{name}', userName))) return;
     try {
       await authApi.deleteUser(userId);
       loadData();
@@ -97,7 +191,7 @@ export function UserManagementPanel({ extraColumns }: UserManagementPanelProps) 
     e.preventDefault();
     setEmailError('');
     if (!newEmail.trim() || !newEmail.includes('@')) {
-      setEmailError('Valid email is required');
+      setEmailError(L.errValidEmailRequired);
       return;
     }
     try {
@@ -114,7 +208,7 @@ export function UserManagementPanel({ extraColumns }: UserManagementPanelProps) 
     e.preventDefault();
     setEmailError('');
     if (!newEmail.trim() || !newEmail.includes('@')) {
-      setEmailError('Valid email is required');
+      setEmailError(L.errValidEmailRequired);
       return;
     }
     try {
@@ -143,7 +237,7 @@ export function UserManagementPanel({ extraColumns }: UserManagementPanelProps) 
   };
 
   const handleRemoveEmail = async (id: number, email: string) => {
-    if (!confirm(`Remove "${email}" from the allowlist?`)) return;
+    if (!confirm(L.confirmRemoveEmail.replace('{email}', email))) return;
     try {
       await authApi.removeAllowedEmail(id);
       loadData();
@@ -154,14 +248,14 @@ export function UserManagementPanel({ extraColumns }: UserManagementPanelProps) 
 
   const handleResetPassword = async (userId: number) => {
     if (!resetPassword || resetPassword.length < 8) {
-      alert('Password must be at least 8 characters');
+      alert(L.errPasswordMin);
       return;
     }
     try {
       await authApi.resetUserPassword(userId, resetPassword);
       setResetUserId(null);
       setResetPassword('');
-      alert('Password reset successfully');
+      alert(L.passwordResetDone);
     } catch (err: any) {
       alert(err.message);
     }
@@ -200,39 +294,35 @@ export function UserManagementPanel({ extraColumns }: UserManagementPanelProps) 
   return (
     <>
       <div className="card mb-lg">
-        <h3 className="card-title mb-md">Registration Mode</h3>
+        <h3 className="card-title mb-md">{L.regModeTitle}</h3>
         <div className="flex gap-sm mb-md">
           <button
             className={`btn btn-sm ${regMode === 'open' ? 'btn-primary' : 'btn-secondary'}`}
             onClick={() => handleSetRegMode('open')}
           >
-            Open
+            {L.regModeOpen}
           </button>
           <button
             className={`btn btn-sm ${regMode === 'allowlist' ? 'btn-primary' : 'btn-secondary'}`}
             onClick={() => handleSetRegMode('allowlist')}
           >
-            Allowlist
+            {L.regModeAllowlist}
           </button>
         </div>
         <p className="text-sm text-muted">
-          {regMode === 'open'
-            ? 'Anyone with a valid email can register. The first user becomes admin.'
-            : 'Only pre-approved emails can log in.'}
+          {regMode === 'open' ? L.regModeOpenHelp : L.regModeAllowlistHelp}
         </p>
       </div>
 
       <div className="card mb-lg">
-        <h3 className="card-title mb-md">Email Allowlist</h3>
+        <h3 className="card-title mb-md">{L.allowlistTitle}</h3>
         {regMode === 'open' && (
           <p className="text-sm text-muted mb-lg" style={{ fontStyle: 'italic' }}>
-            The allowlist is not currently enforced. Switch to Allowlist mode to restrict registration.
+            {L.allowlistNotEnforced}
           </p>
         )}
         <p className="text-sm text-muted mb-lg">
-          {regMode === 'allowlist'
-            ? 'Only these email addresses can log in. Add emails before users authenticate.'
-            : 'Manage emails for when you switch to Allowlist mode.'}
+          {regMode === 'allowlist' ? L.allowlistHelpEnforced : L.allowlistHelpNotEnforced}
         </p>
 
         <div className="mb-md">
@@ -242,7 +332,7 @@ export function UserManagementPanel({ extraColumns }: UserManagementPanelProps) 
               className="form-input"
               value={newEmail}
               onChange={(e) => setNewEmail(e.target.value)}
-              placeholder="email@example.com"
+              placeholder={L.emailPlaceholder}
               style={{ flex: 1 }}
             />
           </div>
@@ -252,13 +342,13 @@ export function UserManagementPanel({ extraColumns }: UserManagementPanelProps) 
               className="form-input"
               value={newName}
               onChange={(e) => setNewName(e.target.value)}
-              placeholder="Name (optional)"
+              placeholder={L.namePlaceholder}
               style={{ flex: 1 }}
             />
           </div>
           <div className="flex gap-sm">
-            <button className="btn btn-secondary" onClick={handleAddEmail}>Add to Allowlist</button>
-            <button className="btn btn-primary" onClick={handlePreCreate}>Create Account</button>
+            <button className="btn btn-secondary" onClick={handleAddEmail}>{L.addToAllowlist}</button>
+            <button className="btn btn-primary" onClick={handlePreCreate}>{L.createAccount}</button>
           </div>
         </div>
 
@@ -269,9 +359,9 @@ export function UserManagementPanel({ extraColumns }: UserManagementPanelProps) 
         <table className="table">
           <thead>
             <tr>
-              <th>Email</th>
-              <th>Status</th>
-              <th>Added</th>
+              <th>{L.colEmail}</th>
+              <th>{L.colStatus}</th>
+              <th>{L.colAdded}</th>
               <th></th>
             </tr>
           </thead>
@@ -281,9 +371,9 @@ export function UserManagementPanel({ extraColumns }: UserManagementPanelProps) 
                 <td className="font-medium">{ae.email}</td>
                 <td>
                   {ae.userId ? (
-                    <span className="badge badge-primary">Registered ({ae.userName})</span>
+                    <span className="badge badge-primary">{L.statusRegistered.replace('{name}', ae.userName ?? '')}</span>
                   ) : (
-                    <span className="badge">Pending</span>
+                    <span className="badge">{L.statusPending}</span>
                   )}
                 </td>
                 <td className="text-muted text-sm">{new Date(ae.createdAt).toLocaleDateString()}</td>
@@ -293,13 +383,13 @@ export function UserManagementPanel({ extraColumns }: UserManagementPanelProps) 
                       className="btn btn-sm btn-secondary"
                       onClick={() => handleImpersonateAllowlistUser(ae)}
                     >
-                      Impersonate
+                      {L.impersonate}
                     </button>
                     <button
                       className="btn btn-sm btn-danger"
                       onClick={() => handleRemoveEmail(ae.id, ae.email)}
                     >
-                      Remove
+                      {L.remove}
                     </button>
                   </div>
                 </td>
@@ -310,18 +400,18 @@ export function UserManagementPanel({ extraColumns }: UserManagementPanelProps) 
       </div>
 
       <div className="card">
-        <h3 className="card-title mb-md">User Management</h3>
+        <h3 className="card-title mb-md">{L.userMgmtTitle}</h3>
 
         <table className="table">
           <thead>
             <tr>
-              <th>User</th>
-              <th>Email</th>
-              <th>Role</th>
+              <th>{L.colUser}</th>
+              <th>{L.colEmail}</th>
+              <th>{L.colRole}</th>
               {extraColumns?.map((col) => (
                 <th key={col.header}>{col.header}</th>
               ))}
-              <th>Joined</th>
+              <th>{L.colJoined}</th>
               <th></th>
             </tr>
           </thead>
@@ -334,13 +424,13 @@ export function UserManagementPanel({ extraColumns }: UserManagementPanelProps) 
                     <span className="font-medium">{u.name}</span>
                   </div>
                 </td>
-                <td className="text-sm text-muted">{u.email || '\u2014'}</td>
+                <td className="text-sm text-muted">{u.email || '—'}</td>
                 <td>
                   <div className="flex gap-sm flex-wrap">
                     {u.isAdmin ? (
-                      <span className="badge badge-primary">Admin</span>
+                      <span className="badge badge-primary">{L.badgeAdmin}</span>
                     ) : (
-                      <span className="badge">User</span>
+                      <span className="badge">{L.badgeUser}</span>
                     )}
                     {(u.roles ?? []).map((role) => (
                       <span key={role} className="badge badge-secondary">{role}</span>
@@ -351,7 +441,7 @@ export function UserManagementPanel({ extraColumns }: UserManagementPanelProps) 
                   <td key={col.header}>{col.render(u)}</td>
                 ))}
                 <td className="text-muted text-sm">
-                  {(u as any).createdAt ? new Date((u as any).createdAt).toLocaleDateString() : '\u2014'}
+                  {(u as any).createdAt ? new Date((u as any).createdAt).toLocaleDateString() : '—'}
                 </td>
                 <td>
                   {u.id !== currentUser?.id && (
@@ -360,13 +450,13 @@ export function UserManagementPanel({ extraColumns }: UserManagementPanelProps) 
                         className="btn btn-sm btn-secondary"
                         onClick={() => handleToggleAdmin(u.id, !u.isAdmin)}
                       >
-                        {u.isAdmin ? 'Remove Admin' : 'Make Admin'}
+                        {u.isAdmin ? L.removeAdmin : L.makeAdmin}
                       </button>
                       <button
                         className="btn btn-sm btn-secondary"
                         onClick={() => handleImpersonate(u.id)}
                       >
-                        Impersonate
+                        {L.impersonate}
                       </button>
                       {availableRoles.length > 0 && (
                         <button
@@ -379,7 +469,7 @@ export function UserManagementPanel({ extraColumns }: UserManagementPanelProps) 
                             }
                           }}
                         >
-                          Roles
+                          {L.rolesButton}
                         </button>
                       )}
                       {authMethod === 'password' && (
@@ -390,14 +480,14 @@ export function UserManagementPanel({ extraColumns }: UserManagementPanelProps) 
                             setResetPassword('');
                           }}
                         >
-                          Reset Password
+                          {L.resetPassword}
                         </button>
                       )}
                       <button
                         className="btn btn-sm btn-danger"
                         onClick={() => handleDeleteUser(u.id, u.name)}
                       >
-                        Delete
+                        {L.deleteButton}
                       </button>
                     </div>
                   )}
@@ -408,14 +498,14 @@ export function UserManagementPanel({ extraColumns }: UserManagementPanelProps) 
                         className="form-input"
                         value={resetPassword}
                         onChange={(e) => setResetPassword(e.target.value)}
-                        placeholder="New password (min 8 chars)"
+                        placeholder={L.newPasswordPlaceholder}
                         style={{ flex: 1, fontSize: '0.85rem' }}
                       />
                       <button
                         className="btn btn-sm btn-primary"
                         onClick={() => handleResetPassword(u.id)}
                       >
-                        Set
+                        {L.setButton}
                       </button>
                     </div>
                   )}
@@ -437,7 +527,7 @@ export function UserManagementPanel({ extraColumns }: UserManagementPanelProps) 
                         className="btn btn-sm btn-primary"
                         onClick={() => handleSaveUserRoles(u.id)}
                       >
-                        Save Roles
+                        {L.saveRoles}
                       </button>
                     </div>
                   )}

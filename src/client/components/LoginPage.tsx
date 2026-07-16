@@ -1,12 +1,49 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext.js';
 
+/** All user-facing strings of the login page. Override any subset via the `labels` prop (e.g. for i18n). */
+export interface LoginPageLabels {
+  emailLabel: string;
+  passwordLabel: string;
+  passwordPlaceholder: string;
+  submitLabel: string;
+  submittingLabel: string;
+  /** Footer shown when registration mode is 'open' (unless `footerText` prop is set). */
+  footerOpen: string;
+  /** Footer shown when registration mode is 'allowlist' (unless `footerText` prop is set). */
+  footerAllowlist: string;
+  errEmailRequired: string;
+  errPasswordRequired: string;
+  errLoginFailed: string;
+  errNotAuthorized: string;
+  errOidcFailed: string;
+  errNoEmail: string;
+}
+
+export const defaultLoginPageLabels: LoginPageLabels = {
+  emailLabel: 'Email',
+  passwordLabel: 'Password',
+  passwordPlaceholder: 'Enter your password',
+  submitLabel: 'Login',
+  submittingLabel: 'Logging in...',
+  footerOpen: 'Open registration — first user becomes admin',
+  footerAllowlist: 'Only pre-approved email addresses can log in',
+  errEmailRequired: 'Email is required',
+  errPasswordRequired: 'Password is required',
+  errLoginFailed: 'Login failed',
+  errNotAuthorized: 'Your email is not authorized to access this application. Contact an administrator.',
+  errOidcFailed: 'Authentication failed. Please try again.',
+  errNoEmail: 'No email was received from the identity provider.',
+};
+
 export interface LoginPageProps {
   title?: string;
   subtitle?: string;
   oidcButtonLabel?: string;
   emailPlaceholder?: string;
   footerText?: string;
+  /** Override any user-facing string (labels, placeholders, error messages). */
+  labels?: Partial<LoginPageLabels>;
 }
 
 export function LoginPage({
@@ -15,7 +52,9 @@ export function LoginPage({
   oidcButtonLabel = 'Log in with SSO',
   emailPlaceholder = 'your@email.com',
   footerText,
+  labels,
 }: LoginPageProps) {
+  const L: LoginPageLabels = { ...defaultLoginPageLabels, ...labels };
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -26,32 +65,33 @@ export function LoginPage({
   const resolvedFooterText = footerText !== undefined
     ? footerText
     : registrationMode === 'open'
-      ? 'Open registration \u2014 first user becomes admin'
-      : 'Only pre-approved email addresses can log in';
+      ? L.footerOpen
+      : L.footerAllowlist;
 
   // Check for OIDC error in URL hash
   useEffect(() => {
     const hash = window.location.hash;
     if (hash.includes('error=not_authorized')) {
-      setError('Your email is not authorized to access this application. Contact an administrator.');
+      setError(L.errNotAuthorized);
     } else if (hash.includes('error=oidc_failed')) {
-      setError('Authentication failed. Please try again.');
+      setError(L.errOidcFailed);
     } else if (hash.includes('error=no_email')) {
-      setError('No email was received from the identity provider.');
+      setError(L.errNoEmail);
     }
     if (hash.includes('error=')) {
       window.location.hash = '';
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handlePasswordSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email.trim()) {
-      setError('Email is required');
+      setError(L.errEmailRequired);
       return;
     }
     if (!password) {
-      setError('Password is required');
+      setError(L.errPasswordRequired);
       return;
     }
 
@@ -61,7 +101,7 @@ export function LoginPage({
     try {
       await login(email.trim(), password);
     } catch (err: any) {
-      setError(err.message || 'Login failed');
+      setError(err.message || L.errLoginFailed);
     } finally {
       setLoading(false);
     }
@@ -93,7 +133,7 @@ export function LoginPage({
           <form onSubmit={handlePasswordSubmit}>
             <div className="form-group">
               <label className="form-label" htmlFor="email">
-                Email
+                {L.emailLabel}
               </label>
               <input
                 type="email"
@@ -108,7 +148,7 @@ export function LoginPage({
 
             <div className="form-group">
               <label className="form-label" htmlFor="password">
-                Password
+                {L.passwordLabel}
               </label>
               <input
                 type="password"
@@ -116,12 +156,12 @@ export function LoginPage({
                 className="form-input"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="Enter your password"
+                placeholder={L.passwordPlaceholder}
               />
             </div>
 
             <button type="submit" className="btn btn-primary" style={{ width: '100%' }} disabled={loading}>
-              {loading ? 'Logging in...' : 'Login'}
+              {loading ? L.submittingLabel : L.submitLabel}
             </button>
           </form>
         )}

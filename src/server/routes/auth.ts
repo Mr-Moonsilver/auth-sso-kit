@@ -10,31 +10,53 @@ const loginAttempts = new Map<string, { count: number; firstAttempt: number }>()
 const RATE_LIMIT_MAX = 5;         // max attempts per window
 const RATE_LIMIT_WINDOW = 15 * 60 * 1000; // 15 minutes
 
-function getRateLimitKey(req: Request): string {
-  // Trust X-Forwarded-For if trust proxy is set, otherwise use socket IP
-  return (req.ip || req.socket.remoteAddress || 'unknown');
+/**
+ * Keyed per account AND source, so one address being attacked cannot lock out another
+ * — and, on a single-operator deployment, so the operator's own IP is not one shared
+ * bucket for every login on the box.
+ */
+function getRateLimitKey(req: Request, email?: string): string {
+  const ip = req.ip || req.socket.remoteAddress || 'unknown';
+  return `${(email ?? '').trim().toLowerCase()}|${ip}`;
 }
 
-function checkLoginRateLimit(req: Request, res: Response): boolean {
-  const key = getRateLimitKey(req);
+/**
+ * CHECKS ONLY — it must not count the attempt. This is a brute-force control, so it
+ * counts FAILURES (recordLoginFailure) and is cleared by a success (clearLoginAttempts).
+ * The previous version incremented here, before authentication, and never reset on
+ * success: five *correct* logins in fifteen minutes locked the account out of its own app.
+ */
+function checkLoginRateLimit(req: Request, res: Response, email?: string): boolean {
+  const entry = loginAttempts.get(getRateLimitKey(req, email));
+  if (!entry) return true;
+
+  const now = Date.now();
+  if (now - entry.firstAttempt > RATE_LIMIT_WINDOW) return true;
+  if (entry.count < RATE_LIMIT_MAX) return true;
+
+  const retryAfter = Math.ceil((entry.firstAttempt + RATE_LIMIT_WINDOW - now) / 1000);
+  res.set('Retry-After', String(retryAfter));
+  res.status(429).json({
+    error: `Too many failed login attempts. Try again in ${Math.ceil(retryAfter / 60)} minute(s).`,
+  });
+  return false;
+}
+
+/** Call on every rejected credential — never on a successful one. */
+function recordLoginFailure(req: Request, email?: string): void {
+  const key = getRateLimitKey(req, email);
   const now = Date.now();
   const entry = loginAttempts.get(key);
-
   if (!entry || now - entry.firstAttempt > RATE_LIMIT_WINDOW) {
     loginAttempts.set(key, { count: 1, firstAttempt: now });
-    return true;
+    return;
   }
-
   entry.count++;
+}
 
-  if (entry.count > RATE_LIMIT_MAX) {
-    const retryAfter = Math.ceil((entry.firstAttempt + RATE_LIMIT_WINDOW - now) / 1000);
-    res.set('Retry-After', String(retryAfter));
-    res.status(429).json({ error: 'Too many login attempts. Please try again later.' });
-    return false;
-  }
-
-  return true;
+/** A correct password proves the requester is not the attacker the counter was for. */
+function clearLoginAttempts(req: Request, email?: string): void {
+  loginAttempts.delete(getRateLimitKey(req, email));
 }
 
 // Cleanup stale entries every 30 minutes
@@ -73,9 +95,6 @@ export function createAuthRouter(
       return res.status(400).json({ error: 'Password login is disabled when SSO is enabled' });
     }
 
-    // Rate limit: 5 attempts per 15 minutes per IP
-    if (!checkLoginRateLimit(req, res)) return;
-
     const { email, password } = req.body;
 
     if (!email || typeof email !== 'string' || !email.trim()) {
@@ -86,11 +105,16 @@ export function createAuthRouter(
     }
 
     const normalizedEmail = email.trim().toLowerCase();
+
+    // Rate limit: 5 FAILED attempts per 15 minutes per account+source.
+    if (!checkLoginRateLimit(req, res, normalizedEmail)) return;
+
     const registrationMode = await db.getSetting('registration_mode') || 'open';
 
     // Check allowlist (skip in open mode)
     const allowed = await db.findAllowedEmail(normalizedEmail);
     if (registrationMode === 'allowlist' && !allowed) {
+      recordLoginFailure(req, normalizedEmail);
       return res.status(403).json({ error: 'Email not authorized. Contact an administrator.' });
     }
 
@@ -116,6 +140,7 @@ export function createAuthRouter(
         passwordHash: hash,
       });
 
+      clearLoginAttempts(req, normalizedEmail);
       req.session.userId = newUser.id;
       hooks?.onUserCreated?.(newUser);
 
@@ -136,10 +161,12 @@ export function createAuthRouter(
     } else {
       const valid = await Bun.password.verify(password, existingUser.passwordHash);
       if (!valid) {
+        recordLoginFailure(req, normalizedEmail);
         return res.status(401).json({ error: 'Invalid password' });
       }
     }
 
+    clearLoginAttempts(req, normalizedEmail);
     req.session.userId = existingUser.id;
     res.json({
       id: existingUser.id,

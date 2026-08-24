@@ -21,6 +21,12 @@ export interface OIDCInstance {
   getAppUrl(): string;
   getRedirectUri(): string;
   getConfig(): Promise<client.Configuration>;
+  /**
+   * The provider's discovery document, once getConfig() has fetched it — null before that.
+   * Synchronous on purpose: callers reach for it on paths (logout) where an await on a
+   * possibly-unreachable IdP would be worse than degrading gracefully.
+   */
+  serverMetadata(): client.ServerMetadata | null;
 }
 
 export function createOIDC(settings: OIDCSettings): OIDCInstance {
@@ -39,6 +45,7 @@ export function createOIDC(settings: OIDCSettings): OIDCInstance {
       );
       return config;
     },
+    serverMetadata: () => (config ? config.serverMetadata() : null),
   };
 }
 

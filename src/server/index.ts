@@ -90,6 +90,8 @@ export async function setupAuth(app: Express, config: AuthKitConfig): Promise<Se
 }
 
 // Re-export everything consumers need
+export { createOIDC } from './oidc.js';
+export type { OIDCSettings, OIDCInstance } from './oidc.js';
 export { createAuthMiddleware } from './middleware.js';
 export type { AuthRequest } from './middleware.js';
 export type { AuthKitConfig, SetupAuthResult, AuthDB, AuthUser, CreateUserData, AllowedEmailRecord, AllowedEmailWithStatus, Role, Permission, RoleSeed, RolesConfig } from './types.js';

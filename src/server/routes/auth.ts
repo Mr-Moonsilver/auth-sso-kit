@@ -159,7 +159,15 @@ export function createAuthRouter(
       const hash = await Bun.password.hash(password);
       await db.updateUserPassword(existingUser.id, hash);
     } else {
-      const valid = await Bun.password.verify(password, existingUser.passwordHash);
+      // A stored hash Bun can't read (unknown algorithm, corrupted) throws — and an
+      // uncaught error in this async handler would take the whole server down.
+      // Treat it as a wrong password instead.
+      let valid = false;
+      try {
+        valid = await Bun.password.verify(password, existingUser.passwordHash);
+      } catch (err) {
+        console.warn(`[auth] unreadable password hash for user ${existingUser.id}:`, (err as Error).message);
+      }
       if (!valid) {
         recordLoginFailure(req, normalizedEmail);
         return res.status(401).json({ error: 'Invalid password' });

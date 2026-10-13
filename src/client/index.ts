@@ -1,8 +1,9 @@
 export { AuthProvider, useAuth } from './context/AuthContext.js';
 export { LoginPage } from './components/LoginPage.js';
-export type { LoginPageProps } from './components/LoginPage.js';
-export { UserManagementPanel } from './components/UserManagementPanel.js';
-export type { UserManagementPanelProps } from './components/UserManagementPanel.js';
+export type { LoginPageProps, LoginPageLabels } from './components/LoginPage.js';
+export { defaultLoginPageLabels } from './components/LoginPage.js';
+export { UserManagementPanel, defaultUserManagementPanelLabels } from './components/UserManagementPanel.js';
+export type { UserManagementPanelProps, UserManagementPanelLabels } from './components/UserManagementPanel.js';
 export { RoleManagementPanel } from './components/RoleManagementPanel.js';
 export type { RoleManagementPanelProps } from './components/RoleManagementPanel.js';
 export { authApi } from './api.js';

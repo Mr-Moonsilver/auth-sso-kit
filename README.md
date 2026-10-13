@@ -125,6 +125,8 @@ alias: {
 | `session.secret` | `string` | Yes | Session secret |
 | `session.maxAge` | `number` | No | Session duration in ms (default: 24h) |
 | `session.secure` | `boolean` | No | Secure cookie flag (default: false) |
+| `session.store` | `session.Store` | No | Session store (default: in-memory — sessions are lost on every restart/redeploy and not shared between containers; pass e.g. a `connect-pg-simple` store in production) |
+| `session.rolling` | `boolean` | No | Reset the cookie expiry on every request, so active users stay logged in (default: false) |
 | `oidc` | `OIDCConfig` | No | OIDC configuration (omit for password-only) |
 | `hooks.onBeforeUserDelete` | `(userId) => void` | No | Called before user deletion |
 | `hooks.onUserCreated` | `(user) => void` | No | Called after user creation |

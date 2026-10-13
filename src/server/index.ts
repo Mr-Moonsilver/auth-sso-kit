@@ -47,6 +47,8 @@ export async function setupAuth(app: Express, config: AuthKitConfig): Promise<Se
   app.use(
     session({
       secret: config.session.secret,
+      store: config.session.store,
+      rolling: config.session.rolling ?? false,
       resave: false,
       saveUninitialized: false,
       cookie: {

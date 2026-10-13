@@ -1,4 +1,5 @@
 import type { RequestHandler, Router } from 'express';
+import type { Store } from 'express-session';
 import type { AuthDB, AuthUser, RoleSeed } from './db/interface.js';
 
 export interface RolesConfig {
@@ -13,6 +14,11 @@ export interface AuthKitConfig {
     secret: string;
     maxAge?: number;
     secure?: boolean;
+    /** Session store. Defaults to express-session's in-memory store, which loses
+     *  every session on restart/redeploy and isn't shared between containers. */
+    store?: Store;
+    /** Re-arm the cookie's maxAge on every request (sliding expiry). Default false. */
+    rolling?: boolean;
   };
   oidc?: {
     issuerUrl: string;
